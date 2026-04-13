@@ -19,8 +19,7 @@ class TestScriptExecutionLimits:
         """Create script execution config for testing."""
         return ScriptExecutionConfig(
             enabled=True,
-            timeout_seconds=5,
-            resource_limits={'max_memory_mb': 128}
+            execution_timeout_seconds=5
         )
 
     @pytest.fixture
@@ -50,7 +49,7 @@ class TestScriptExecutionLimits:
 
     def test_config_timeout_setting(self, script_config: ScriptExecutionConfig):
         """Test that timeout configuration is properly set."""
-        assert script_config.timeout_seconds == 5
+        assert script_config.execution_timeout_seconds == 5
         assert script_config.enabled is True
 
     @pytest.mark.skip(reason="Integration test - requires Docker")
@@ -67,17 +66,20 @@ class TestScriptExecutionLimits:
 
     def test_resource_limit_validation(self):
         """Test that resource limits can be configured."""
+        from ollm.config import ScriptExecutionResourcesConfig
+        
         config = ScriptExecutionConfig(
             enabled=True,
-            timeout_seconds=30,
-            resource_limits={
-                'max_memory_mb': 256,
-                'max_cpu_cores': 2
+            execution_timeout_seconds=30,
+            resources={
+                "memory_limit": "256m",
+                "cpu_limit": 2.0
             }
         )
         
-        assert config.resource_limits['max_memory_mb'] == 256
-        assert config.resource_limits['max_cpu_cores'] == 2
+        assert config.resources.memory_limit == "256m"
+        assert config.resources.cpu_limit == 2.0
+        assert config.execution_timeout_seconds == 30
 
     def test_environment_variables_passed(self):
         """Test that environment variables are properly passed."""

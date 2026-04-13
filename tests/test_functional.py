@@ -68,7 +68,7 @@ def test_path_resolution():
                 (temp_path / "ollm").mkdir()
                 
                 result = resolve_install_directory()
-                assert result == temp_path / "ollm"
+                assert result.resolve() == (temp_path / "ollm").resolve()
 
 
 if __name__ == "__main__":

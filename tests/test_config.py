@@ -26,7 +26,7 @@ class TestConfigDefaults:
         """Test that missing required baseUrl fails."""
         invalid_config = {"apiKey": "test"}
         
-        with pytest.raises(ValueError, match="baseUrl is required"):
+        with pytest.raises(Exception, match="Field required"):
             Config(**invalid_config)
 
     def test_config_loading_from_file(self, temp_dir: Path, sample_config: dict):

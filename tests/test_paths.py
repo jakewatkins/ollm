@@ -19,9 +19,13 @@ class TestInstallDirectoryResolution:
         install_dir = temp_dir / "ollm"
         install_dir.mkdir()
         
+        # Mock Path.home() to make temp_dir appear under home directory
+        fake_home = temp_dir.parent
+        
         with patch.dict(os.environ, {"OLLM_HOME": str(install_dir)}):
-            result = resolve_install_directory()
-            assert result == install_dir
+            with patch.object(Path, 'home', return_value=fake_home):
+                result = resolve_install_directory()
+                assert result.resolve() == install_dir.resolve()
 
     def test_executable_parent_when_no_env(self, temp_dir: Path):
         """Test that executable parent is used when no OLLM_HOME."""
@@ -30,10 +34,14 @@ class TestInstallDirectoryResolution:
         fake_executable.parent.mkdir(parents=True)
         fake_executable.touch()
         
+        # Mock Path.home() to make temp_dir appear under home directory
+        fake_home = temp_dir.parent
+        
         with patch.dict(os.environ, {}, clear=True):
             with patch.object(sys, 'executable', str(fake_executable)):
-                result = resolve_install_directory()
-                assert result == temp_dir
+                with patch.object(Path, 'home', return_value=fake_home):
+                    result = resolve_install_directory()
+                    assert result.resolve() == (temp_dir / "bin").resolve()  # Should return parent of executable
 
     def test_invalid_path_outside_home_fails(self, temp_dir: Path):
         """Test that install root outside user home fails."""
@@ -60,7 +68,7 @@ class TestInstallDirectoryResolution:
         with patch('pathlib.Path.home', return_value=temp_dir):
             with patch.dict(os.environ, {"OLLM_HOME": str(ollm_dir)}):
                 result = resolve_install_directory()
-                assert result == ollm_dir
+                assert result.resolve() == ollm_dir.resolve()
 
     def test_relative_path_resolution(self, temp_dir: Path):
         """Test that relative paths are properly resolved."""

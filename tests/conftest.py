@@ -5,6 +5,11 @@ import tempfile
 import shutil
 from pathlib import Path
 from typing import Generator
+from unittest.mock import Mock
+
+from ollm.config import Config, AgentLoopConfig
+from ollm.ollama_client import OllamaClient
+from ollm.mcp.client import McpClient
 
 
 @pytest.fixture
@@ -31,7 +36,7 @@ def sample_config() -> dict:
         "skills": {
             "selection": {
                 "topK": 1,
-                "minScore": 0.30,
+                "minScore": 0.35,
                 "fuzzyMatch": True
             },
             "resources": {
@@ -73,6 +78,41 @@ This is a test skill for unit testing.
 - Test feature 1
 - Test feature 2
 """
+
+
+@pytest.fixture
+def mock_config(sample_config: dict) -> Config:
+    """Mock config object for tests."""
+    return Config(**sample_config)
+
+
+@pytest.fixture
+def mock_ollama_client() -> Mock:
+    """Mock Ollama client for tests."""
+    client = Mock(spec=OllamaClient)
+    client.chat.return_value = {
+        "message": {
+            "content": "I'll help you with that task.",
+            "tool_calls": None
+        }
+    }
+    return client
+
+
+@pytest.fixture
+def mock_mcp_client() -> Mock:
+    """Mock MCP client for tests."""
+    client = Mock(spec=McpClient)
+    client.get_tools.return_value = []
+    return client
+
+
+@pytest.fixture
+def timeout_config(sample_config: dict) -> Config:
+    """Config with short timeouts for testing."""
+    config_data = sample_config.copy()
+    config_data["agentLoop"]["requestTimeoutSeconds"] = 1  # 1 second timeout
+    return Config(**config_data)
 
 
 @pytest.fixture
