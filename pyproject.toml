@@ -51,6 +51,9 @@ Documentation = "https://github.com/example/ollm#readme"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+ollm = ["data/*.json"]
+
 [tool.black]
 line-length = 88
 target-version = ['py311']

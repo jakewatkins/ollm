@@ -1,0 +1,26 @@
+{
+  "baseUrl": "http://localhost:11434",
+  "apiKey": "",
+  "agentLoop": {
+    "maxTurns": 8,
+    "toolCallTimeoutSeconds": 60,
+    "requestTimeoutSeconds": 300
+  },
+  "logging": {
+    "level": "info",
+    "format": "jsonl",
+    "maxFileSizeMB": 10,
+    "maxFiles": 5
+  },
+  "skills": {
+    "selection": {
+      "topK": 1,
+      "minScore": 0.35,
+      "fuzzyMatch": true
+    },
+    "resources": {
+      "maxFileSizeKB": 64,
+      "maxTotalSizeKB": 256
+    }
+  }
+}

@@ -4,7 +4,20 @@ This document provides a comprehensive manual testing checklist for verifying ol
 
 ## Prerequisites
 
-1. Install ollm in clean environment: `pip install -e ".[dev]"`
+1. Install ollm in development mode:
+   ```bash
+   # Make sure you're in the ollm project root directory
+   cd /path/to/ollm  # or wherever you cloned the repository
+   
+   # Install in editable/development mode with dev dependencies
+   # Note: Use single quotes for zsh shell compatibility
+   pip install -e '.[dev]'
+   
+   # Alternative commands if the above fails:
+   pip install -e .                    # Install without dev deps
+   pip install -r requirements-dev.txt # Then install dev deps separately (if file exists)
+   ```
+
 2. Ensure Ollama is running: `ollama serve`
 3. Have at least one model available: `ollama pull llama3.2:latest`
 4. Create test directory: `mkdir -p ~/tmp/ollm-test && cd ~/tmp/ollm-test`
@@ -13,16 +26,16 @@ This document provides a comprehensive manual testing checklist for verifying ol
 
 ### 1. Basic CLI Functionality
 
-#### 1.1 Command Help and Version
+#### 1.1 Command Help and Model Listing
 ```bash
 # Test help output
 ollm --help
 
-# Test version display  
-ollm --version
+# Test model listing
+ollm --listModels
 ```
 
-**Expected**: Help shows all options, version shows current version
+**Expected**: Help shows all CLI options, model listing shows available Ollama models
 
 #### 1.2 Interactive Input (-p flag)
 ```bash
