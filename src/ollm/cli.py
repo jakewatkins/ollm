@@ -35,12 +35,48 @@ def main(
         Optional[str],
         typer.Option("-m", "--model", help="Ollama model name to use")
     ] = None,
+    list_models: Annotated[
+        bool,
+        typer.Option("--listModels", help="List available Ollama models (one per line)")
+    ] = False,
 ) -> None:
     """Process a prompt using Ollama with MCP tools and skills support."""
+    
+    # Handle list models mode
+    if list_models:
+        # Validate that only -o can be combined with --listModels
+        if prompt is not None or prompt_file is not None or model is not None:
+            print("Error: --listModels can only be combined with -o/--output flag.", file=sys.stderr)
+            raise typer.Exit(1)
+        
+        try:
+            ollm_app.list_models(output)
+        except OllmError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            raise typer.Exit(1)
+        finally:
+            ollm_app.cleanup()
+        return
     
     # Initialize the application
     ollm_app = get_app()
     ollm_app.initialize()
+    
+    # Handle list models mode
+    if list_models:
+        # Validate that only -o can be combined with --listModels
+        if prompt is not None or prompt_file is not None or model is not None:
+            print("Error: --listModels can only be combined with -o/--output flag.", file=sys.stderr)
+            raise typer.Exit(1)
+        
+        try:
+            ollm_app.list_models(output)
+        except OllmError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            raise typer.Exit(1)
+        finally:
+            ollm_app.cleanup()
+        return
     
     # Validate mutually exclusive prompt options
     if prompt is not None and prompt_file is not None:

@@ -132,6 +132,40 @@ class OllmApp:
             logger.error(f"Unexpected error processing prompt: {e}")
             raise OllmError(f"Unexpected error: {e}")
     
+    def list_models(self, output_file: Optional[Path] = None) -> None:
+        """List available Ollama models.
+        
+        Args:
+            output_file: Optional output file path
+        """
+        if not self.config or not self.ollama_client:
+            raise OllmError("Application not initialized")
+        
+        logger.info("Listing available models", extra={
+            "output_file": str(output_file) if output_file else None
+        })
+        
+        try:
+            # Get models from Ollama
+            model_names = self.ollama_client.list_models()
+            
+            # Convert to text (one per line)
+            model_list_text = "\n".join(model_names)
+            
+            # Write output
+            write_output(model_list_text, output_file)
+            
+            logger.info("Model listing completed successfully", extra={
+                "model_count": len(model_names)
+            })
+            
+        except OllamaError as e:
+            logger.error(f"Ollama error listing models: {e}")
+            raise OllmError(f"Failed to list models: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error listing models: {e}")
+            raise OllmError(f"Unexpected error: {e}")
+    
     def cleanup(self) -> None:
         """Cleanup resources."""
         # Cleanup MCP connections
