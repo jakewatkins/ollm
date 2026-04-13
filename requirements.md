@@ -376,4 +376,123 @@ acceptance and test requirements (initial):
 	- verify logs are created and rotated in `logs/`
 	- verify top-1 auto-selected skill is logged at debug level
 
+### Script Execution Requirements
 
+ollm will support sandboxed script execution as a complement to MCP tools.
+
+motivation:
+- MCP tools are ideal for structured APIs and real-time service integrations.
+- script execution enables complex workflows, data processing, and multi-step operations that are difficult to express through individual tool calls.
+- containerized execution provides security isolation while giving LLMs full scripting flexibility.
+
+script execution tool requirements:
+- ollm will expose a built-in tool named `execute_script` alongside MCP-derived tools.
+- the `execute_script` tool will accept script content and execute it in a secure Docker container.
+- tool execution will capture stdout, stderr, and exit code from the script.
+- tool results will be returned to Ollama as formatted text containing the script output.
+
+execute_script tool parameters:
+- `script`: required string. The script content to execute.
+- `language`: required string. Script language/interpreter. Allowed values: `python3`, `bash`, `shell`.
+- `timeout`: optional integer. Maximum execution time in seconds. Default is `30`. Maximum is `300`.
+- `workdir`: optional string. Working directory inside container. Default is `/workspace`.
+- `network`: optional boolean. Enable container network access. Default is `false`.
+
+script execution runtime requirements:
+- ollm will use Docker to create isolated containers for script execution.
+- each script execution will run in a fresh container instance.
+- containers will be automatically removed after execution completes or times out.
+- ollm will create a temporary working directory for each script execution.
+- script content will be written to the container's working directory before execution.
+- stdout and stderr will be captured separately and included in the tool result.
+
+container image requirements:
+- ollm will use a custom `ollm-runner` Docker image for script execution.
+- the image will be based on `ubuntu:22.04` for compatibility and tooling.
+- the image will include:
+  - `python3` and `pip` for Python scripting
+  - `bash` and common shell utilities
+  - `curl`, `wget`, `jq` for web requests and data processing  
+  - `git` for repository operations
+  - `nano`, `vim` for text editing (if scripts need to create files)
+- the image will have a non-root user (`ollm`) as the default execution user.
+- the image will not include network tools like `netcat`, `nmap`, or SSH clients by default.
+
+security model requirements:
+- by default, containers will have no network access (`--network none`).
+- when `network: true` is specified, containers will use bridge networking with no special privileges.
+- containers will use resource limits: `--memory 512m --cpus 1.0` by default.
+- the container filesystem will be read-only except for the working directory.
+- scripts cannot persist data between executions unless explicitly designed to output serialized data.
+- execution timeout will be enforced at the container level with `docker run --timeout`.
+- ollm will never mount the host filesystem into script execution containers.
+
+script execution integration with skills:
+- skills can declare script execution capability using a new frontmatter field: `scriptExecution: true`.
+- when a skill with `scriptExecution: true` is selected, ollm will expose the `execute_script` tool alongside any required MCP tools.
+- skills without `scriptExecution: true` will not have access to the script execution tool.
+- skill instructions can guide the LLM on when and how to use script execution vs MCP tools.
+
+container lifecycle requirements:
+- ollm will verify Docker is available and the `ollm-runner` image is present before enabling script execution.
+- if Docker is not available, ollm will log a warning and disable script execution silently.
+- if the `ollm-runner` image is missing, ollm will attempt to pull it automatically.
+- if image pull fails, ollm will log an error and disable script execution for that session.
+- container execution errors (timeout, exit code != 0) will be returned as tool results rather than causing ollm to crash.
+
+script execution configuration:
+- script execution settings will be configurable through `config.json` under a `scriptExecution` section.
+- configuration will include default timeout, resource limits, and image name.
+- network access policy can be configured globally or left to skills to request per execution.
+
+example script execution configuration:
+
+```json
+{
+  "scriptExecution": {
+    "enabled": true,
+    "image": "ollm-runner:latest",
+    "defaultTimeout": 30,
+    "maxTimeout": 300,
+    "defaultNetwork": false,
+    "resources": {
+      "memory": "512m",
+      "cpus": 1.0
+    }
+  }
+}
+```
+
+script execution logging requirements:
+- script executions will be logged at info level with execution time, exit code, and container ID.
+- script content will not be logged to avoid exposing sensitive data.
+- stdout/stderr length will be logged but content will only be logged at debug level.
+- timeouts and resource limit violations will be logged at warn level.
+
+script execution failure handling:
+- if Docker daemon is not running, ollm will disable script execution and log the reason.
+- if a container fails to start, ollm will return the error as the tool result.
+- if a script times out, ollm will kill the container and return timeout information as the tool result.
+- if a script exits with non-zero status, ollm will return both stdout and stderr as the tool result.
+
+example skill with script execution:
+
+```markdown
+---
+name: data-analysis
+description: Use when analyzing data files, generating reports, or performing statistical analysis.
+scriptExecution: true
+resources:
+  - analysis-template.py
+---
+
+# Data Analysis Skill
+
+For data analysis tasks, you can use the execute_script tool to run Python scripts for:
+- Loading and processing CSV/JSON files
+- Performing statistical calculations  
+- Generating visualizations
+- Creating summary reports
+
+Use MCP tools for data retrieval and script execution for processing.
+```

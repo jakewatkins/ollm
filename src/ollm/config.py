@@ -78,6 +78,33 @@ class SkillsConfig(BaseModel):
     resources: SkillsResourcesConfig = Field(default_factory=SkillsResourcesConfig)
 
 
+class ScriptExecutionResourcesConfig(BaseModel):
+    """Configuration for script execution resource limits."""
+    memory: str = Field(default="512m", description="Memory limit for containers")
+    cpus: float = Field(default=1.0, ge=0.1, le=8.0, description="CPU limit for containers")
+
+
+class ScriptExecutionConfig(BaseModel):
+    """Configuration for script execution."""
+    enabled: bool = Field(default=True, description="Enable script execution")
+    image: str = Field(default="ollm-runner:latest", description="Docker image for script execution")
+    default_timeout: int = Field(default=30, alias="defaultTimeout", ge=1, le=300, description="Default timeout in seconds")
+    max_timeout: int = Field(default=300, alias="maxTimeout", ge=1, le=600, description="Maximum timeout in seconds")
+    default_network: bool = Field(default=False, alias="defaultNetwork", description="Default network access")
+    resources: ScriptExecutionResourcesConfig = Field(default_factory=ScriptExecutionResourcesConfig)
+    
+    class Config:
+        validate_by_name = True
+    
+    @validator('max_timeout')
+    def validate_max_timeout(cls, v, values):
+        """Ensure max_timeout >= default_timeout."""
+        default_timeout = values.get('default_timeout', 30)
+        if v < default_timeout:
+            return default_timeout
+        return v
+
+
 class Config(BaseModel):
     """Main configuration for ollm."""
     base_url: str = Field(..., alias="baseUrl", description="Base URL for Ollama server")
@@ -85,6 +112,7 @@ class Config(BaseModel):
     agent_loop: AgentLoopConfig = Field(default_factory=AgentLoopConfig, alias="agentLoop")
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    script_execution: ScriptExecutionConfig = Field(default_factory=ScriptExecutionConfig, alias="scriptExecution")
     
     class Config:
         validate_by_name = True

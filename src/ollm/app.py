@@ -17,6 +17,7 @@ from .model_selection import select_model
 from .ollama_client import OllamaClient
 from .output import write_output
 from .paths import resolve_install_directory
+from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
 
 logger = get_logger(__name__)
 
@@ -30,6 +31,9 @@ class OllmApp:
         self.ollama_client: Optional[OllamaClient] = None
         self.mcp_client: Optional[McpClient] = None
         self.agent_loop: Optional[AgentLoop] = None
+        self.skill_loader: Optional[SkillLoader] = None
+        self.skill_selector: Optional[SkillSelector] = None
+        self.skill_context_builder: Optional[SkillContextBuilder] = None
     
     def initialize(self) -> None:
         """Initialize the application.
@@ -61,6 +65,13 @@ class OllmApp:
             # Initialize MCP connections
             asyncio.run(self._async_init_mcp())
             
+            # Initialize skills system
+            skills_dir = self.install_dir / "skills"
+            self.skill_loader = SkillLoader(self.config, skills_dir)
+            self.skill_selector = SkillSelector(self.config)
+            self.skill_context_builder = SkillContextBuilder()
+            logger.info("Skills system initialized")
+            
             # Initialize agent loop
             self.agent_loop = AgentLoop(
                 self.ollama_client,
@@ -90,7 +101,7 @@ class OllmApp:
         model: Optional[str] = None,
         output_file: Optional[Path] = None
     ) -> None:
-        """Process a prompt using Ollama with MCP tools support.
+        """Process a prompt using Ollama with MCP tools and skills support.
         
         Args:
             prompt_content: The prompt to process
@@ -100,21 +111,45 @@ class OllmApp:
         if not self.config or not self.ollama_client or not self.agent_loop:
             raise OllmError("Application not initialized")
         
+        # Get available MCP servers for skill selection
+        available_mcp_servers = []
+        if self.mcp_client:
+            available_mcp_servers = list(self.mcp_client.get_connected_servers())
+        
         logger.info("Processing prompt", extra={
             "prompt_length": len(prompt_content),
             "requested_model": model,
             "output_file": str(output_file) if output_file else None,
-            "tools_available": len(self.mcp_client.get_tools()) if self.mcp_client else 0
+            "tools_available": len(self.mcp_client.get_tools()) if self.mcp_client else 0,
+            "mcp_servers": len(available_mcp_servers)
         })
         
         try:
+            # Select best skill for this prompt
+            selected_skill = None
+            skill_context = []
+            
+            if self.skill_loader and self.skill_selector and self.skill_context_builder:
+                available_skills = self.skill_loader.discover_skills()
+                selected_skill = self.skill_selector.select_skill(
+                    prompt_content, 
+                    available_skills, 
+                    available_mcp_servers
+                )
+                
+                if selected_skill:
+                    skill_context = self.skill_context_builder.build_context(selected_skill)
+                    logger.info(f"Using skill: {selected_skill.name}")
+                else:
+                    logger.debug("No skill selected for this prompt")
+            
             # Select model to use
             selected_model = select_model(self.ollama_client, model)
             
-            # Run agent loop
+            # Run agent loop with skill context
             logger.debug(f"Starting agent loop with model: {selected_model}")
             response = asyncio.run(
-                self.agent_loop.run(selected_model, prompt_content)
+                self.agent_loop.run(selected_model, prompt_content, skill_context)
             )
             
             # Write output
@@ -122,7 +157,8 @@ class OllmApp:
             
             logger.info("Prompt processing completed successfully", extra={
                 "model_used": selected_model,
-                "response_length": len(response)
+                "response_length": len(response),
+                "skill_used": selected_skill.name if selected_skill else None
             })
             
         except OllamaError as e:

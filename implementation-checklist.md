@@ -130,17 +130,19 @@ Acceptance:
 - [x] maxTurns path exits cleanly.
 - [x] tool timeout path exits cleanly.
 
-## Milestone 5: Skills Top-1 Selection
+## Milestone 5: Skills and Script Execution
 
 ### Issue 5.1: skill discovery and parsing
 - [ ] Scan skills/<name>/SKILL.md.
 - [ ] Parse frontmatter and markdown body.
 - [ ] Enforce required fields name and description.
+- [ ] Parse scriptExecution boolean flag.
 - [ ] Skip malformed skills with warnings.
 
 Acceptance:
 - [ ] valid skills load.
 - [ ] malformed skills are skipped and logged.
+- [ ] scriptExecution flag is parsed correctly.
 
 ### Issue 5.2: deterministic scoring and selection
 - [ ] Implement lexical scoring:
@@ -166,6 +168,39 @@ Acceptance:
 Acceptance:
 - [ ] selected skill changes request context.
 - [ ] oversize skill is skipped with warning.
+
+### Issue 5.4: script execution infrastructure
+- [ ] Implement Docker client wrapper.
+- [ ] Build or configure ollm-runner container image.
+- [ ] Implement execute_script tool with parameters:
+  - [ ] script (content)
+  - [ ] language (python3, bash, shell)
+  - [ ] timeout (default 30s, max 300s)
+  - [ ] workdir (default /workspace)
+  - [ ] network (default false)
+- [ ] Capture stdout, stderr, exit code.
+- [ ] Apply security restrictions:
+  - [ ] no network by default
+  - [ ] resource limits (512M memory, 1 CPU)
+  - [ ] fresh containers only
+  - [ ] non-root execution user
+
+Acceptance:
+- [ ] execute_script tool executes safely in containers.
+- [ ] Docker unavailable gracefully disables script execution.
+- [ ] security restrictions are enforced.
+
+### Issue 5.5: script execution integration
+- [ ] Only expose execute_script when skill has scriptExecution: true.
+- [ ] Add execute_script to tool list alongside MCP tools.
+- [ ] Configure script execution settings via config.json.
+- [ ] Log script executions (duration, exit code, not content).
+- [ ] Handle container failures gracefully.
+
+Acceptance:
+- [ ] skills without scriptExecution don't see execute_script.
+- [ ] skills with scriptExecution can use execute_script tool.
+- [ ] script execution is properly configured and logged.
 
 ## Milestone 6: Packaging and Documentation
 

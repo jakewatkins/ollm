@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-Implement a Python CLI tool that wraps Ollama HTTP chat, integrates MCP servers from mcp.json, auto-selects one best-matching skill from skills, and executes a bounded tool-calling loop with safe logging and configuration defaults.
+Implement a Python CLI tool that wraps Ollama HTTP chat, integrates MCP servers from mcp.json, auto-selects one best-matching skill from skills, provides sandboxed script execution capabilities, and executes a bounded tool-calling loop with safe logging and configuration defaults.
 
 ## 2. Delivery Strategy
 
@@ -50,6 +50,12 @@ ollm/
         loader.py
         selector.py
         context_builder.py
+      script_execution/
+        __init__.py
+        docker_client.py
+        executor.py
+        container_manager.py
+        script_tool.py
       loop/
         __init__.py
         agent_loop.py
@@ -147,9 +153,9 @@ Done criteria:
 - tool-capable model can request MCP tools and receive results.
 - loop exits safely on no tool calls, max turns, or request timeout.
 
-## Phase 5: Skills discovery and top-1 selection
+## Phase 5: Skills discovery, selection, and script execution
 
-Goal: automatic single-skill selection with deterministic scoring.
+Goal: automatic single-skill selection with deterministic scoring and sandboxed script execution capabilities.
 
 Tasks:
 - Load skills from skills/<name>/SKILL.md.
@@ -169,10 +175,20 @@ Tasks:
   - maxTotalSizeKB
   - oversize skill is skipped and logged
 - Inject selected skill body and resources as hidden/system context in chat request.
+- Implement `execute_script` built-in tool:
+  - Docker container execution
+  - Support for python3, bash, shell languages
+  - Capture stdout, stderr, exit code
+  - Security isolation (no network by default, resource limits)
+  - Configurable timeouts and container image
+- Skills can opt-in to script execution via `scriptExecution: true` frontmatter.
+- Build or pull `ollm-runner` Docker image with common tools.
 
 Done criteria:
 - one best skill is selected or none selected.
 - selected skill affects context and tool usage behavior.
+- skills with scriptExecution: true expose execute_script tool.
+- script execution works in isolated Docker containers.
 
 ## Phase 6: Hardening, packaging, and docs
 
@@ -245,6 +261,10 @@ This order gives a working non-tool CLI first, then progressively adds MCP and s
   - Mitigation: enforce resource limits and skip oversize skills.
 - Timeout tuning may be workload-specific
   - Mitigation: keep timeouts configurable with safe defaults.
+- Docker availability and container security
+  - Mitigation: graceful fallback when Docker unavailable, strict container isolation.
+- Script execution security risks
+  - Mitigation: no network by default, resource limits, fresh containers only.
 - Packaging path assumptions
   - Mitigation: centralize install-dir resolution and test under real deployment path.
 

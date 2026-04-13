@@ -22,5 +22,16 @@
       "maxFileSizeKB": 64,
       "maxTotalSizeKB": 256
     }
+  },
+  "scriptExecution": {
+    "enabled": true,
+    "image": "ollm-runner:latest",
+    "defaultTimeout": 30,
+    "maxTimeout": 300,
+    "defaultNetwork": false,
+    "resources": {
+      "memory": "512m",
+      "cpus": 1.0
+    }
   }
 }

@@ -162,3 +162,22 @@ Let me perform some testing.  Before I do that, can you help me with these detai
 ## We might want to add a flag to ollm so it can return a list of models available in ollama
 ## we also might want to modify the skills requirements so they can use cli stuff in addition to mcp
 
+Before we move to the next milestone, I'd like to add a flag to ollm so it will show the user a list of models being hosted by ollama.  Usage would look like:
+ollm -listModels
+the output will have 1 model name per line like this:
+gemma4:31b
+qwen3-coder:30b
+qwen3.5:latest
+nomic-embed-text:latest
+llama3.2:latest
+the -listModels flag can only be combined with the -o flag causing the output to be written to a file.  If any other flags are used print an error.
+
+
+That works wonderfully!  
+Now before we implement skills, I'd like to reconsider our current skills requirements.  
+I'd like skills to be able to make use of cli interfaces and write scripts to get things done.  Is there a way we could implement skills this way where the llm is able to write scripts that we execute inside a sandbox (say a docker container) and then return the output to the llm?  For instance, we could setup that the llm can write a script the stores its output in output.txt that is stored in a known location (use volume mapping so it persists after the container exits) that ollm will read and send the contents back to the llm.
+The goal is to offer a more efficient way to use tools than mcp and allow llms to write scripts to solve problems.
+Does this make sense?  
+If so, is there a better way to do it?
+Do we need to add these requirements to our skills requirements section?
+Additionally, Do we need to setup a container image for this purpose or is there an ideal container image already available?  I'm assuming llms will want to write using python or bash scripts.  The container would need a tool like curl to make it easy to do web requests.

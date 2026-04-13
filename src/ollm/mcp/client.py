@@ -265,6 +265,10 @@ class McpClient:
         """Get list of all available tools."""
         return list(self.tools.values())
     
+    def get_connected_servers(self) -> List[str]:
+        """Get list of successfully connected server names."""
+        return [name for name, server in self.servers.items() if server.connected]
+    
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool on the appropriate MCP server."""
         if tool_name not in self.tools:

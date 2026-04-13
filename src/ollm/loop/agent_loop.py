@@ -32,13 +32,15 @@ class AgentLoop:
     async def run(
         self,
         model: str,
-        initial_prompt: str
+        initial_prompt: str,
+        skill_context: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """Run the agent loop.
         
         Args:
             model: Ollama model to use
             initial_prompt: Initial user prompt
+            skill_context: Optional skill context messages to inject
             
         Returns:
             Final assistant response
@@ -50,15 +52,22 @@ class AgentLoop:
             "model": model,
             "max_turns": self.config.max_turns,
             "tool_call_timeout": self.config.tool_call_timeout_seconds,
-            "request_timeout": self.config.request_timeout_seconds
+            "request_timeout": self.config.request_timeout_seconds,
+            "skill_context_messages": len(skill_context) if skill_context else 0
         })
         
         self.timer.reset()
         
-        # Build initial messages
-        messages = [
-            {"role": "user", "content": initial_prompt}
-        ]
+        # Build initial messages with skill context
+        messages = []
+        
+        # Add skill context first (as system messages)
+        if skill_context:
+            messages.extend(skill_context)
+            logger.debug(f"Added {len(skill_context)} skill context messages")
+        
+        # Add user prompt
+        messages.append({"role": "user", "content": initial_prompt})
         
         # Get available tools
         tools = self.mcp_client.get_tools()
