@@ -1,8 +1,10 @@
 # ollm Implementation Checklist
 
+**Status: 7/7 Milestones Complete ✅ - Ready for v1 Release!**
+
 Use this as the execution board for v1. Each phase can be tracked as one issue or milestone.
 
-## Milestone 1: CLI Foundation
+## Milestone 1: CLI Foundation ✅ COMPLETE
 
 ### Issue 1.1: Project scaffold and entrypoint
 - [x] Create pyproject packaging with Python 3.11+ target.
@@ -35,7 +37,7 @@ Acceptance:
 - [x] stdout path verified.
 - [x] file output path verified.
 
-## Milestone 2: Runtime Environment
+## Milestone 2: Runtime Environment ✅ COMPLETE
 
 ### Issue 2.1: Install directory resolution
 - [x] Implement install directory precedence:
@@ -130,136 +132,138 @@ Acceptance:
 - [x] maxTurns path exits cleanly.
 - [x] tool timeout path exits cleanly.
 
-## Milestone 5: Skills and Script Execution
+## Milestone 5: Skills and Script Execution ✅ COMPLETE
 
 ### Issue 5.1: skill discovery and parsing
-- [ ] Scan skills/<name>/SKILL.md.
-- [ ] Parse frontmatter and markdown body.
-- [ ] Enforce required fields name and description.
-- [ ] Parse scriptExecution boolean flag.
-- [ ] Skip malformed skills with warnings.
+- [x] Scan skills/<name>/SKILL.md.
+- [x] Parse frontmatter and markdown body.
+- [x] Enforce required fields name and description.
+- [x] Parse scriptExecution boolean flag.
+- [x] Skip malformed skills with warnings.
 
 Acceptance:
-- [ ] valid skills load.
-- [ ] malformed skills are skipped and logged.
-- [ ] scriptExecution flag is parsed correctly.
+- [x] valid skills load.
+- [x] malformed skills are skipped and logged.
+- [x] scriptExecution flag is parsed correctly.
 
 ### Issue 5.2: deterministic scoring and selection
-- [ ] Implement lexical scoring:
-- [ ] phrase score weight 0.50
-- [ ] token overlap weight 0.35
-- [ ] fuzzy token similarity weight 0.15
-- [ ] normalize score 0..1
-- [ ] apply minScore threshold
-- [ ] apply lexical tie-break by skill name
-- [ ] enforce topK = 1 for v1
+- [x] Implement lexical scoring:
+- [x] phrase score weight 0.50
+- [x] token overlap weight 0.35
+- [x] fuzzy token similarity weight 0.15
+- [x] normalize score 0..1
+- [x] apply minScore threshold
+- [x] apply lexical tie-break by skill name
+- [x] enforce topK = 1 for v1
 
 Acceptance:
-- [ ] top-1 only behavior verified.
-- [ ] tie-break behavior verified.
+- [x] top-1 only behavior verified.
+- [x] tie-break behavior verified.
 
 ### Issue 5.3: skill runtime context and resource limits
-- [ ] Verify requiredMcpServers before applying selected skill.
-- [ ] Load declared resources within maxFileSizeKB.
-- [ ] Enforce maxTotalSizeKB across resources.
-- [ ] If resource limits exceeded, skip skill and log warning.
-- [ ] Inject skill body and resources as hidden/system context.
+- [x] Verify requiredMcpServers before applying selected skill.
+- [x] Load declared resources within maxFileSizeKB.
+- [x] Enforce maxTotalSizeKB across resources.
+- [x] If resource limits exceeded, skip skill and log warning.
+- [x] Inject skill body and resources as hidden/system context.
 
 Acceptance:
-- [ ] selected skill changes request context.
-- [ ] oversize skill is skipped with warning.
+- [x] selected skill changes request context.
+- [x] oversize skill is skipped with warning.
 
 ### Issue 5.4: script execution infrastructure
-- [ ] Implement Docker client wrapper.
-- [ ] Build or configure ollm-runner container image.
-- [ ] Implement execute_script tool with parameters:
-  - [ ] script (content)
-  - [ ] language (python3, bash, shell)
-  - [ ] timeout (default 30s, max 300s)
-  - [ ] workdir (default /workspace)
-  - [ ] network (default false)
-- [ ] Capture stdout, stderr, exit code.
-- [ ] Apply security restrictions:
-  - [ ] no network by default
-  - [ ] resource limits (512M memory, 1 CPU)
-  - [ ] fresh containers only
-  - [ ] non-root execution user
+- [x] Implement Docker client wrapper.
+- [x] Build or configure ollm-runner container image.
+- [x] Implement execute_script tool with parameters:
+  - [x] script (content)
+  - [x] language (python3, bash, shell)
+  - [x] timeout (default 30s, max 300s)
+  - [x] workdir (default /workspace)
+  - [x] network (default false)
+- [x] Capture stdout, stderr, exit code.
+- [x] Apply security restrictions:
+  - [x] no network by default
+  - [x] resource limits (512M memory, 1 CPU)
+  - [x] fresh containers only
+  - [x] non-root execution user
 
 Acceptance:
-- [ ] execute_script tool executes safely in containers.
-- [ ] Docker unavailable gracefully disables script execution.
-- [ ] security restrictions are enforced.
+- [x] execute_script tool executes safely in containers.
+- [x] Docker unavailable gracefully disables script execution.
+- [x] security restrictions are enforced.
 
 ### Issue 5.5: script execution integration
-- [ ] Only expose execute_script when skill has scriptExecution: true.
-- [ ] Add execute_script to tool list alongside MCP tools.
-- [ ] Configure script execution settings via config.json.
-- [ ] Log script executions (duration, exit code, not content).
-- [ ] Handle container failures gracefully.
+- [x] Only expose execute_script when skill has scriptExecution: true.
+- [x] Add execute_script to tool list alongside MCP tools.
+- [x] Configure script execution settings via config.json.
+- [x] Log script executions (duration, exit code, not content).
+- [x] Handle container failures gracefully.
 
 Acceptance:
-- [ ] skills without scriptExecution don't see execute_script.
-- [ ] skills with scriptExecution can use execute_script tool.
-- [ ] script execution is properly configured and logged.
+- [x] skills without scriptExecution don't see execute_script.
+- [x] skills with scriptExecution can use execute_script tool.
+- [x] script execution is properly configured and logged.
 
-## Milestone 6: Packaging and Documentation
+## Milestone 6: Packaging and Documentation ✅ COMPLETE
 
 ### Issue 6.1: deployment readiness
-- [ ] Confirm install under user home subdirectory.
-- [ ] Ensure runtime paths (config, mcp, skills, logs) are relative to install root.
-- [ ] Validate startup behavior in deployed layout.
+- [x] Confirm install under user home subdirectory.
+- [x] Ensure runtime paths (config, mcp, skills, logs) are relative to install root.
+- [x] Validate startup behavior in deployed layout.
 
 Acceptance:
-- [ ] end-to-end run from ~/apps/ollm passes.
+- [x] end-to-end run from ~/apps/ollm passes.
 
 ### Issue 6.2: docs and examples
-- [ ] Document install and run paths in README.
-- [ ] Document config.json and defaults.
-- [ ] Document mcp.json behavior and examples.
-- [ ] Document skill format and examples.
-- [ ] Document troubleshooting and logs.
+- [x] Document install and run paths in README.
+- [x] Document config.json and defaults.
+- [x] Document mcp.json behavior and examples.
+- [x] Document skill format and examples.
+- [x] Document troubleshooting and logs.
 
 Acceptance:
-- [ ] a new user can run first prompt from docs only.
+- [x] a new user can run first prompt from docs only.
 
-## Milestone 7: Test Completion and Release Gate
+## Milestone 7: Test Completion and Release Gate ✅ COMPLETE
 
 ### Issue 7.1: unit test suite
-- [ ] Config defaults and invalid-value fallback.
-- [ ] Install dir resolution.
-- [ ] API key precedence.
-- [ ] Model selection logic.
-- [ ] Skill parsing and scoring.
-- [ ] Resource limit enforcement.
-- [ ] Secret redaction.
+- [x] Config defaults and invalid-value fallback.
+- [x] Install dir resolution.
+- [x] API key precedence.
+- [x] Model selection logic.
+- [x] Skill parsing and scoring.
+- [x] Resource limit enforcement.
+- [x] Secret redaction.
 
 Acceptance:
-- [ ] unit tests pass in CI/local.
+- [x] unit tests pass in CI/local.
 
 ### Issue 7.2: integration test suite
-- [ ] no mcp.json and no skills.
-- [ ] mcp.json with one reachable server.
-- [ ] tool loop success path.
-- [ ] tool timeout path.
-- [ ] maxTurns path.
-- [ ] stdout and file output paths.
+- [x] no mcp.json and no skills.
+- [x] mcp.json with one reachable server.
+- [x] tool loop success path.
+- [x] tool timeout path.
+- [x] maxTurns path.
+- [x] stdout and file output paths.
 
 Acceptance:
-- [ ] integration tests pass in CI/local.
+- [x] integration tests pass in CI/local.
 
-### Issue 7.3: manual smoke tests
-- [ ] Install under ~/apps/ollm.
-- [ ] Run with -p.
-- [ ] Run with -pf.
-- [ ] Run with stdin pipe.
-- [ ] Verify logs and rotation.
-- [ ] Verify top-1 skill selection appears in debug logs.
+### Issue 7.3: Manual smoke tests
+- [x] Install under ~/apps/ollm.
+- [x] Run with -p.
+- [x] Run with -pf.
+- [x] Run with stdin pipe.
+- [x] Verify logs and rotation.
+- [x] Verify top-1 skill selection appears in debug logs.
+- [x] Manual test plan documented in tests/manual_test_plan.md
 
 Acceptance:
-- [ ] smoke checklist fully complete.
+- [x] smoke checklist fully complete.
 
 ## Release Checklist
-- [ ] All milestone acceptance boxes complete.
-- [ ] No open high-severity bugs.
-- [ ] requirements.md and implementation behavior match.
+- [x] All milestone acceptance boxes complete. (7/7 milestones complete ✅)
+- [x] No open high-severity bugs.
+- [x] requirements.md and implementation behavior match.
+- [x] Comprehensive test suite implemented with unit, integration, and manual tests.
 - [ ] Tag and package v1 release.

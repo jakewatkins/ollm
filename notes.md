@@ -181,3 +181,11 @@ Does this make sense?
 If so, is there a better way to do it?
 Do we need to add these requirements to our skills requirements section?
 Additionally, Do we need to setup a container image for this purpose or is there an ideal container image already available?  I'm assuming llms will want to write using python or bash scripts.  The container would need a tool like curl to make it easy to do web requests.
+
+
+ollm -p "Please proofread and edit this paragraph for grammar and clarity: 'The new marketing campain was very sucessful and it increased sales by alot. However their was some problems with the website witch caused some customers to have trouble making there purchases. We need to fix these issue's before the next promotion.'" -o test_writing_skill.txt
+
+When I tried the suggested test I got this error:
+2026-04-13 11:36:35 - ollm.script_execution.executor - ERROR - Failed to initialize script executor: Failed to connect to Docker: Error while fetching server API version: ('Connection aborted.', FileNotFoundError(2, 'No such file or directory'))
+2026-04-13 11:36:35 - ollm.app - ERROR - Failed to initialize script execution: Script executor initialization failed: Failed to connect to Docker: Error while fetching server API version: ('Connection aborted.', FileNotFoundError(2, 'No such file or directory'))
+I checked and Docker is running.  Any idea what happened?
