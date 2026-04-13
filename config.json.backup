@@ -15,7 +15,7 @@
   "skills": {
     "selection": {
       "topK": 1,
-      "minScore": 0.30,
+      "minScore": 0.35,
       "fuzzyMatch": true
     },
     "resources": {
@@ -25,7 +25,7 @@
   },
   "scriptExecution": {
     "enabled": true,
-    "image": "python:3.11-slim",
+    "image": "ollm-runner:latest",
     "executionTimeoutSeconds": 30,
     "environment": {},
     "resources": {

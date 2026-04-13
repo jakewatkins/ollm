@@ -171,7 +171,7 @@ class OllmApp:
                         script_tool = SkillAwareScriptTool(
                             self.script_executor,
                             selected_skill.name,
-                            selected_skill.resources
+                            selected_skill.resource_files
                         )
                         
                         additional_tools.append(script_tool)
@@ -179,7 +179,7 @@ class OllmApp:
                         logger.info(
                             f"Added script execution tool for skill '{selected_skill.name}'",
                             extra={
-                                "skill_resources": len(selected_skill.resources),
+                                "skill_resources": len(selected_skill.resource_files),
                                 "script_execution_enabled": True
                             }
                         )

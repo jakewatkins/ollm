@@ -34,27 +34,29 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+> **Development Note:** After installation, use the `ollm` command directly. For uninstalled development, you can still use `python -m src.ollm` to run from source.
+
 ### Basic Usage
 
 ```bash
 # Using prompt from command line
-python -m src.ollm -p "What is the capital of France?"
+ollm -p "What is the capital of France?"
 
 # List available models
-python -m src.ollm --listModels
+ollm --listModels
 
 # Using prompt from file
 echo "What is the capital of France?" > prompt.txt
-python -m src.ollm -pf prompt.txt
+ollm -pf prompt.txt
 
 # Using stdin
-echo "What is the capital of France?" | python -m src.ollm
+echo "What is the capital of France?" | ollm
 
 # Save output to file
-python -m src.ollm -p "What is the capital of France?" -o output.txt
+ollm -p "What is the capital of France?" -o output.txt
 
 # Specify model and config
-python -m src.ollm -p "Help me code" -m llama3.2:latest -c config.json
+ollm -p "Help me code" -m llama3.2:latest -c config.json
 ```
 
 ### Skills Examples
@@ -63,13 +65,13 @@ The skills system automatically enhances prompts with specialized guidance:
 
 ```bash
 # Writing assistance (uses writing-help skill)
-python -m src.ollm -p "Help me improve this email: 'Hey, can you fix the thing?'"
+ollm -p "Help me improve this email: 'Hey, can you fix the thing?'"
 
 # Code review (uses github-review skill)  
-python -m src.ollm -p "Review this pull request for security issues"
+ollm -p "Review this pull request for security issues"
 
 # Data analysis (uses data-analysis skill)
-python -m src.ollm -p "Analyze this CSV data and find trends"
+ollm -p "Analyze this CSV data and find trends"
 ```
 
 ### Command Options

@@ -164,11 +164,12 @@ class AgentLoop:
             Ollama chat response
         """
         # Note: Real Ollama tools support depends on the model and Ollama version
-        # For now, just make a regular chat request
+        # Pass tools to enable script execution and other MCP tools
         return await asyncio.to_thread(
             self.ollama_client.chat,
             model=model,
-            messages=messages
+            messages=messages,
+            tools=tools
         )
     
     async def _process_tool_calls(

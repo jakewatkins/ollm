@@ -161,7 +161,6 @@ class DockerClient:
                 cpu_quota=spec.cpu_quota,
                 cpu_period=spec.cpu_period,
                 detach=True,
-                remove=False,  # We'll remove manually for better error handling
                 user="1000:1000",  # Non-root user
                 read_only=True,  # Read-only filesystem
                 tmpfs={"/tmp": "noexec,nosuid,size=64m"},  # Limited tmp space
