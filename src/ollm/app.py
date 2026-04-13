@@ -28,6 +28,7 @@ class OllmApp:
     
     def __init__(self):
         self.config: Optional[Config] = None
+        self.config_file: Optional[Path] = None
         self.install_dir: Optional[Path] = None
         self.ollama_client: Optional[OllamaClient] = None
         self.mcp_client: Optional[McpClient] = None
@@ -49,7 +50,7 @@ class OllmApp:
             logger.info(f"Using install directory: {self.install_dir}")
             
             # Load configuration
-            self.config = load_config()
+            self.config = load_config(self.config_file)
             logger.info("Configuration loaded successfully")
             
             # Setup logging with loaded config
@@ -75,12 +76,17 @@ class OllmApp:
             logger.info("Skills system initialized")
             
             # Initialize script execution (if enabled)
-            if self.config.script_execution.enabled:
-                self.script_executor = ScriptExecutor(self.config.script_execution)
-                asyncio.run(self._async_init_script_executor())
-                logger.info("Script execution system initialized")
-            else:
-                logger.info("Script execution disabled in configuration")
+            try:
+                if self.config.script_execution.enabled:
+                    self.script_executor = ScriptExecutor(self.config.script_execution)
+                    asyncio.run(self._async_init_script_executor())
+                    logger.info("Script execution system initialized")
+                else:
+                    logger.info("Script execution disabled in configuration")
+            except Exception as e:
+                logger.error(f"Failed to initialize script execution: {e}")
+                logger.info("Continuing without script execution capabilities")
+                self.script_executor = None
             
             # Initialize agent loop
             self.agent_loop = AgentLoop(

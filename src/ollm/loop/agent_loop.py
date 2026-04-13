@@ -7,8 +7,7 @@ from typing import Dict, List, Any, Optional
 from ..config import AgentLoopConfig
 from ..errors import OllmError
 from ..logging_setup import get_logger
-from ..mcp.client import McpClient
-from ..mcp.tool import McpTool
+from ..mcp.client import McpClient, McpTool
 from ..mcp.tool_adapter import convert_mcp_tools_to_ollama
 from ..ollama_client import OllamaClient
 from .timeouts import with_timeout, Timer, TimeoutError

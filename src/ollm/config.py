@@ -80,29 +80,20 @@ class SkillsConfig(BaseModel):
 
 class ScriptExecutionResourcesConfig(BaseModel):
     """Configuration for script execution resource limits."""
-    memory: str = Field(default="512m", description="Memory limit for containers")
-    cpus: float = Field(default=1.0, ge=0.1, le=8.0, description="CPU limit for containers")
+    memory_limit: str = Field(default="128m", alias="memoryLimit", description="Memory limit for containers")
+    cpu_limit: float = Field(default=0.5, alias="cpuLimit", ge=0.1, le=8.0, description="CPU limit for containers")
 
 
 class ScriptExecutionConfig(BaseModel):
     """Configuration for script execution."""
-    enabled: bool = Field(default=True, description="Enable script execution")
+    enabled: bool = Field(default=False, description="Enable script execution")
     image: str = Field(default="ollm-runner:latest", description="Docker image for script execution")
-    default_timeout: int = Field(default=30, alias="defaultTimeout", ge=1, le=300, description="Default timeout in seconds")
-    max_timeout: int = Field(default=300, alias="maxTimeout", ge=1, le=600, description="Maximum timeout in seconds")
-    default_network: bool = Field(default=False, alias="defaultNetwork", description="Default network access")
+    execution_timeout_seconds: int = Field(default=30, alias="executionTimeoutSeconds", ge=1, le=600, description="Execution timeout in seconds")
+    environment: Dict[str, str] = Field(default_factory=dict, description="Environment variables for containers")
     resources: ScriptExecutionResourcesConfig = Field(default_factory=ScriptExecutionResourcesConfig)
     
     class Config:
         validate_by_name = True
-    
-    @validator('max_timeout')
-    def validate_max_timeout(cls, v, values):
-        """Ensure max_timeout >= default_timeout."""
-        default_timeout = values.get('default_timeout', 30)
-        if v < default_timeout:
-            return default_timeout
-        return v
 
 
 class Config(BaseModel):
@@ -145,8 +136,11 @@ def get_api_key(config: Config) -> Optional[str]:
     return None
 
 
-def load_config() -> Config:
-    """Load configuration from config.json.
+def load_config(config_path: Optional[Path] = None) -> Config:
+    """Load configuration from config JSON file.
+    
+    Args:
+        config_path: Optional path to config file. If None, uses default location.
     
     Returns:
         Loaded configuration object
@@ -154,7 +148,8 @@ def load_config() -> Config:
     Raises:
         ConfigurationError: If config cannot be loaded or is invalid
     """
-    config_path = get_config_path()
+    if config_path is None:
+        config_path = get_config_path()
     
     if not config_path.exists():
         raise ConfigurationError(

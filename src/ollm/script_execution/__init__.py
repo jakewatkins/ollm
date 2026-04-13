@@ -20,11 +20,12 @@ Security Features:
 from .docker_client import DockerClient
 from .container_manager import ContainerManager
 from .executor import ScriptExecutor
-from .script_tool import ScriptTool
+from .script_tool import ScriptTool, SkillAwareScriptTool
 
 __all__ = [
     "DockerClient",
     "ContainerManager", 
     "ScriptExecutor",
-    "ScriptTool"
+    "ScriptTool",
+    "SkillAwareScriptTool"
 ]

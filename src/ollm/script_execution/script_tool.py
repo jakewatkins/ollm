@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Any
 
 from .executor import ScriptExecutor, ScriptExecutionRequest, ScriptExecutionResponse
-from ..mcp.tool import McpTool
+from ..mcp.client import McpTool
 
 logger = logging.getLogger(__name__)
 

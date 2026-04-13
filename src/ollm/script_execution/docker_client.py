@@ -11,7 +11,7 @@ from docker.models.containers import Container
 from docker.errors import DockerException, ContainerError, ImageNotFound
 
 from ..config import ScriptExecutionConfig
-from ..exceptions import OllmError
+from ..errors import OllmError
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,33 @@ class DockerClient:
             OllmError: If Docker is not available or configuration is invalid
         """
         try:
-            # Create Docker client (synchronous)
-            self._client = docker.from_env()
+            # Create Docker client with explicit socket path for macOS compatibility
+            import platform
+            import os
             
-            # Test Docker connectivity
+            if platform.system() == "Darwin":  # macOS
+                # Try macOS Docker Desktop socket locations
+                docker_socket_paths = [
+                    "unix:///var/run/docker.sock",
+                    f"unix://{os.path.expanduser('~')}/.docker/run/docker.sock",
+                ]
+                
+                for socket_path in docker_socket_paths:
+                    try:
+                        self._client = docker.DockerClient(base_url=socket_path)
+                        self._client.ping()
+                        logger.debug(f"Connected to Docker via {socket_path}")
+                        break
+                    except Exception:
+                        continue
+                else:
+                    # Fallback to environment
+                    self._client = docker.from_env()
+            else:
+                # Non-macOS systems
+                self._client = docker.from_env()
+            
+            # Test final connectivity
             self._client.ping()
             
             # Ensure required image exists

@@ -10,7 +10,7 @@ import json
 
 from .docker_client import DockerClient, ContainerSpec, ExecutionResult
 from ..config import ScriptExecutionConfig
-from ..exceptions import OllmError
+from ..errors import OllmError
 
 logger = logging.getLogger(__name__)
 

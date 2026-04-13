@@ -7,7 +7,7 @@
     "requestTimeoutSeconds": 300
   },
   "logging": {
-    "level": "debug",
+    "level": "info",
     "format": "jsonl",
     "maxFileSizeMB": 10,
     "maxFiles": 5
@@ -24,8 +24,8 @@
     }
   },
   "scriptExecution": {
-    "enabled": true,
-    "image": "python:3.11-slim",
+    "enabled": false,
+    "image": "ollm-runner:latest",
     "executionTimeoutSeconds": 30,
     "environment": {},
     "resources": {

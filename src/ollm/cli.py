@@ -35,6 +35,10 @@ def main(
         Optional[str],
         typer.Option("-m", "--model", help="Ollama model name to use")
     ] = None,
+    config_file: Annotated[
+        Optional[Path],
+        typer.Option("-c", "--config", help="Configuration file path")
+    ] = None,
     list_models: Annotated[
         bool,
         typer.Option("--listModels", help="List available Ollama models (one per line)")
@@ -44,6 +48,9 @@ def main(
     
     # Initialize the application
     ollm_app = get_app()
+    # Set custom config file if provided
+    if config_file:
+        ollm_app.config_file = config_file
     ollm_app.initialize()
     
     # Handle list models mode

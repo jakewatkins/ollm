@@ -9,7 +9,7 @@ from dataclasses import dataclass, asdict
 from .docker_client import DockerClient, ExecutionResult
 from .container_manager import ContainerManager
 from ..config import ScriptExecutionConfig
-from ..exceptions import OllmError
+from ..errors import OllmError
 
 logger = logging.getLogger(__name__)
 
