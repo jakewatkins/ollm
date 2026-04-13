@@ -42,22 +42,6 @@ def main(
 ) -> None:
     """Process a prompt using Ollama with MCP tools and skills support."""
     
-    # Handle list models mode
-    if list_models:
-        # Validate that only -o can be combined with --listModels
-        if prompt is not None or prompt_file is not None or model is not None:
-            print("Error: --listModels can only be combined with -o/--output flag.", file=sys.stderr)
-            raise typer.Exit(1)
-        
-        try:
-            ollm_app.list_models(output)
-        except OllmError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            raise typer.Exit(1)
-        finally:
-            ollm_app.cleanup()
-        return
-    
     # Initialize the application
     ollm_app = get_app()
     ollm_app.initialize()
