@@ -1,0 +1,41 @@
+---
+name: your-skill-name
+description: Use when the user asks to perform this workflow.
+requiredMcpServers:
+  - server-name
+preferredTools:
+  - server.tool_name
+resources:
+  - checklist.md
+---
+
+# Your Skill Title
+
+Use this skill when the request matches the description above.
+
+## Goal
+
+Describe what this skill should accomplish.
+
+## Workflow
+
+1. Identify the user's intent and constraints.
+2. Use available MCP tools to gather required information.
+3. Produce a concise, actionable response.
+
+## Tool Use Guidance
+
+- Prefer the tools listed in `preferredTools` when available.
+- If required servers are unavailable, skip this skill.
+- Do not attempt actions outside available MCP tools.
+
+## Output Requirements
+
+- State assumptions clearly.
+- Return concrete results before optional commentary.
+- Call out risks and missing information.
+
+## Notes
+
+- Keep instructions deterministic and task-focused.
+- Keep resource files small so they can be loaded within configured limits.

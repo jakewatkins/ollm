@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/npx", 
+      "args": ["-y", "@playwright/mcp@latest"],
+      "sandboxEnabled": true,
+      "sandbox": {
+        "network": {
+          "allowedDomains": ["*.google.com", "*.github.com", "*.stackoverflow.com"]
+        }
+      }
+    }
+  }
+}
