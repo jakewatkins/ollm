@@ -18,9 +18,13 @@ This document provides a comprehensive manual testing checklist for verifying ol
    pip install -r requirements-dev.txt # Then install dev deps separately (if file exists)
    ```
 
-2. Ensure Ollama is running: `ollama serve`
-3. Have at least one model available: `ollama pull llama3.2:latest`
-4. Create test directory: `mkdir -p ~/tmp/ollm-test && cd ~/tmp/ollm-test`
+2. **Configuration Setup** (automatic with improved path resolution):
+   - ollm now automatically finds config files via environment variables or fallbacks
+   - Set `OLLM_CONFIG=path/to/config.json` for custom config location
+   - Falls back to install directory, home directory, then packaged defaults
+   
+3. Ensure Ollama is running: `ollama serve`
+4. Have at least one model available: `ollama pull llama3.2:latest`
 
 ## Test Suite
 
@@ -74,23 +78,25 @@ ollm -m llama3.2:latest -p "Hello world"
 
 **Expected**: Uses specified model, confirms model in verbose output
 
-#### 2.2 Config File Loading
+#### 2.2 Config File Loading and Resolution
 ```bash
-# Create test config
-cat > test-config.json << EOF
-{
-  "baseUrl": "http://localhost:11434",
-  "agentLoop": {
-    "maxTurns": 3
-  }
-}
-EOF
+# Test automatic config resolution (should work without explicit config)
+ollm --listModels
 
-# Test config loading
-OLLM_CONFIG=test-config.json ollm -p "Test config loading" -v
+# Test with explicit config file
+ollm -c /path/to/config.json -p "Test custom config"
+
+# Test OLLM_CONFIG environment variable
+export OLLM_CONFIG=/path/to/my-config.json
+ollm -p "Test environment variable config"
+
+# Test config file in home directory
+cp config.json ~/config.json
+unset OLLM_CONFIG  
+ollm -p "Test home directory config"
 ```
 
-**Expected**: Loads config, respects maxTurns=3 in verbose output
+**Expected**: Config loading works in all scenarios, with proper fallback order
 
 ### 3. Skills System
 
