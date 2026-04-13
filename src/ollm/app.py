@@ -18,6 +18,7 @@ from .ollama_client import OllamaClient
 from .output import write_output
 from .paths import resolve_install_directory
 from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
+from .script_execution import ScriptExecutor, SkillAwareScriptTool
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,7 @@ class OllmApp:
         self.skill_loader: Optional[SkillLoader] = None
         self.skill_selector: Optional[SkillSelector] = None
         self.skill_context_builder: Optional[SkillContextBuilder] = None
+        self.script_executor: Optional[ScriptExecutor] = None
     
     def initialize(self) -> None:
         """Initialize the application.
@@ -72,6 +74,14 @@ class OllmApp:
             self.skill_context_builder = SkillContextBuilder()
             logger.info("Skills system initialized")
             
+            # Initialize script execution (if enabled)
+            if self.config.script_execution.enabled:
+                self.script_executor = ScriptExecutor(self.config.script_execution)
+                asyncio.run(self._async_init_script_executor())
+                logger.info("Script execution system initialized")
+            else:
+                logger.info("Script execution disabled in configuration")
+            
             # Initialize agent loop
             self.agent_loop = AgentLoop(
                 self.ollama_client,
@@ -94,6 +104,11 @@ class OllmApp:
         """Initialize MCP connections asynchronously."""
         if self.mcp_client:
             await self.mcp_client.connect_all()
+    
+    async def _async_init_script_executor(self) -> None:
+        """Initialize script executor asynchronously."""
+        if self.script_executor:
+            await self.script_executor.initialize()
     
     def process_prompt(
         self, 
@@ -128,6 +143,7 @@ class OllmApp:
             # Select best skill for this prompt
             selected_skill = None
             skill_context = []
+            additional_tools = []
             
             if self.skill_loader and self.skill_selector and self.skill_context_builder:
                 available_skills = self.skill_loader.discover_skills()
@@ -139,6 +155,29 @@ class OllmApp:
                 
                 if selected_skill:
                     skill_context = self.skill_context_builder.build_context(selected_skill)
+                    
+                    # Add script execution tools if skill supports it and executor is available
+                    if (selected_skill.metadata.scriptExecution and 
+                        self.script_executor and 
+                        self.script_executor.is_initialized()):
+                        
+                        # Create skill-aware script tool with resources
+                        script_tool = SkillAwareScriptTool(
+                            self.script_executor,
+                            selected_skill.name,
+                            selected_skill.resources
+                        )
+                        
+                        additional_tools.append(script_tool)
+                        
+                        logger.info(
+                            f"Added script execution tool for skill '{selected_skill.name}'",
+                            extra={
+                                "skill_resources": len(selected_skill.resources),
+                                "script_execution_enabled": True
+                            }
+                        )
+                    
                     logger.info(f"Using skill: {selected_skill.name}")
                 else:
                     logger.debug("No skill selected for this prompt")
@@ -146,10 +185,15 @@ class OllmApp:
             # Select model to use
             selected_model = select_model(self.ollama_client, model)
             
-            # Run agent loop with skill context
+            # Run agent loop with skill context and additional tools
             logger.debug(f"Starting agent loop with model: {selected_model}")
             response = asyncio.run(
-                self.agent_loop.run(selected_model, prompt_content, skill_context)
+                self.agent_loop.run(
+                    selected_model, 
+                    prompt_content, 
+                    skill_context, 
+                    additional_tools
+                )
             )
             
             # Write output
@@ -204,6 +248,10 @@ class OllmApp:
     
     def cleanup(self) -> None:
         """Cleanup resources."""
+        # Cleanup script executor
+        if self.script_executor:
+            asyncio.run(self.script_executor.cleanup())
+        
         # Cleanup MCP connections
         if self.mcp_client:
             asyncio.run(self.mcp_client.disconnect_all())

@@ -8,6 +8,7 @@ from ..config import AgentLoopConfig
 from ..errors import OllmError
 from ..logging_setup import get_logger
 from ..mcp.client import McpClient
+from ..mcp.tool import McpTool
 from ..mcp.tool_adapter import convert_mcp_tools_to_ollama
 from ..ollama_client import OllamaClient
 from .timeouts import with_timeout, Timer, TimeoutError
@@ -33,7 +34,8 @@ class AgentLoop:
         self,
         model: str,
         initial_prompt: str,
-        skill_context: Optional[List[Dict[str, Any]]] = None
+        skill_context: Optional[List[Dict[str, Any]]] = None,
+        additional_tools: Optional[List[McpTool]] = None
     ) -> str:
         """Run the agent loop.
         
@@ -41,6 +43,7 @@ class AgentLoop:
             model: Ollama model to use
             initial_prompt: Initial user prompt
             skill_context: Optional skill context messages to inject
+            additional_tools: Optional additional tools to make available
             
         Returns:
             Final assistant response
@@ -70,10 +73,19 @@ class AgentLoop:
         messages.append({"role": "user", "content": initial_prompt})
         
         # Get available tools
-        tools = self.mcp_client.get_tools()
-        ollama_tools = convert_mcp_tools_to_ollama(tools) if tools else None
+        mcp_tools = self.mcp_client.get_tools()
+        all_tools = list(mcp_tools)  # Make a copy
         
-        logger.debug(f"Available tools: {len(tools) if tools else 0}")
+        # Add additional tools if provided
+        if additional_tools:
+            all_tools.extend(additional_tools)
+            
+        ollama_tools = convert_mcp_tools_to_ollama(all_tools) if all_tools else None
+        
+        # Store tools for resolution during tool calls
+        self._current_tools = {tool.name: tool for tool in all_tools}
+        
+        logger.debug(f"Available tools: {len(all_tools) if all_tools else 0}")
         
         # Main conversation loop
         turn = 0
@@ -107,6 +119,10 @@ class AgentLoop:
                         "elapsed_time": self.timer.elapsed(),
                         "final_response_length": len(assistant_message["content"])
                     })
+                    
+                    # Cleanup
+                    self._current_tools = {}
+                    
                     return assistant_message["content"]
                 
                 # Process tool calls
@@ -121,6 +137,9 @@ class AgentLoop:
         
         # Max turns reached
         logger.warning(f"Agent loop hit max turns limit ({self.config.max_turns})")
+        
+        # Cleanup
+        self._current_tools = {}
         
         # Return the last assistant response, or a default message
         for message in reversed(messages):
@@ -186,9 +205,15 @@ class AgentLoop:
                 if isinstance(tool_arguments, str):
                     tool_arguments = json.loads(tool_arguments)
                 
+                # Find and call tool
+                if tool_name not in self._current_tools:
+                    raise OllmError(f"Tool '{tool_name}' not found")
+                
+                tool = self._current_tools[tool_name]
+                
                 # Call tool with timeout
                 result = await with_timeout(
-                    self.mcp_client.call_tool(tool_name, tool_arguments),
+                    tool.call(tool_arguments),
                     self.config.tool_call_timeout_seconds,
                     f"tool call '{tool_name}'"
                 )
