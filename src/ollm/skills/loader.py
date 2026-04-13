@@ -111,8 +111,8 @@ class SkillLoader:
         Raises:
             SkillParseError: If resources exceed limits
         """
-        max_file_size = self.config.skills.resources.maxFileSizeKB * 1024
-        max_total_size = self.config.skills.resources.maxTotalSizeKB * 1024
+        max_file_size = self.config.skills.resources.max_file_size_kb * 1024
+        max_total_size = self.config.skills.resources.max_total_size_kb * 1024
         
         total_size = 0
         loaded_resources = {}

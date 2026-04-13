@@ -75,7 +75,7 @@ class SkillSelector:
         scored_skills.sort(key=lambda x: (-x.score, x.skill.name))
         
         # Apply minimum score threshold
-        min_score = self.config.skills.selection.minScore
+        min_score = self.config.skills.selection.min_score
         best_score = scored_skills[0]
         
         if best_score.score < min_score:
@@ -86,8 +86,8 @@ class SkillSelector:
             return None
         
         # In v1, enforce topK = 1
-        if self.config.skills.selection.topK != 1:
-            logger.warning(f"topK={self.config.skills.selection.topK} not supported, using 1")
+        if self.config.skills.selection.top_k != 1:
+            logger.warning(f"topK={self.config.skills.selection.top_k} not supported, using 1")
         
         selected_skill = best_score.skill
         logger.info(f"Selected skill '{selected_skill.name}' with score {best_score.score:.3f}")
@@ -127,7 +127,7 @@ class SkillSelector:
         
         # 3. Fuzzy token similarity (weight: 0.15)
         fuzzy_score = 0.0
-        if self.config.skills.selection.fuzzyMatch:
+        if self.config.skills.selection.fuzzy_match:
             fuzzy_score = self._score_fuzzy_similarity(prompt_tokens, skill)
         details['fuzzy_similarity'] = fuzzy_score
         
