@@ -10,6 +10,14 @@
           "allowedDomains": ["*.google.com", "*.github.com", "*.stackoverflow.com"]
         }
       }
+    },
+    "brave-search": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "http"],
+      "env": {
+        "BRAVE_API_KEY": "{BraveApiKey}"
+      }
     }
   }
 }

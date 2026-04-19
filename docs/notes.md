@@ -189,3 +189,72 @@ When I tried the suggested test I got this error:
 2026-04-13 11:36:35 - ollm.script_execution.executor - ERROR - Failed to initialize script executor: Failed to connect to Docker: Error while fetching server API version: ('Connection aborted.', FileNotFoundError(2, 'No such file or directory'))
 2026-04-13 11:36:35 - ollm.app - ERROR - Failed to initialize script execution: Script executor initialization failed: Failed to connect to Docker: Error while fetching server API version: ('Connection aborted.', FileNotFoundError(2, 'No such file or directory'))
 I checked and Docker is running.  Any idea what happened?
+
+## Secrets - done
+I store secrets in an azure key vault.  It would be nice if I could put markers in skills and MCP config that would cause ollm to get the secret value from my key vault.
+- keyvault name would be in config.json
+- use $secretName$ to mark secrets
+usage:
+- perform searches using the google search api using this key: $google_search_key$
+ollm would fetch google_search_key from my key vault and replace the value when the skill was used.  Or if used in mcp.json the same thing would happen.
+
+## research skill - done
+Ollm's mcp and basic skills capabilities appear to work well.  Now I'd like to create a research skill system where I can prompt ollm and it will first create a plan to perform the research and then orchestrate the execution of the research.  It can expect the playwright mcp plugin to be available or it can execute scripts in a container to perform web searches.
+Can you help me create this skill?
+
+
+## Add files to context
+Add a parameter on the command line that lets me attach text or markdown files to a context.
+the parameter will be -a or --attach and the file name
+like so:
+ollm -p "please review my essay about peptides" -a peptides-rock.md
+ollm will append the file after the prompt like so:
+{$prompt}
+```
+{$file_content}
+```
+
+## Memory
+I want to add memory to ollm so that we can build a personality.  The first layer will be remembering.
+ollm will create a history.json file.  the prompt, tool calls, skills used and responses will all be stored in the json file.  In the first iteration, ollm just writes to the file.  We'll figure out how to use it later.
+Initially this is just a log file.
+
+## Telemetry
+I want to publish the usage data Ollama sends in its responses to New Relic OpenTelemetry API so I can track activity.  Additionally, I'd like ollm to push its own telemetry data including:
+- prompt size
+- tool calls
+- skill usage
+- response size
+- end to end timing
+Ollama provides the following fields in its responses:
+{
+  "model": "gemma3",
+  "created_at": "2025-10-17T23:14:07.414671Z",
+  "response": "Hello! How can I help you today?",
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 174560334,
+  "load_duration": 101397084,
+  "prompt_eval_count": 11,
+  "prompt_eval_duration": 13074791,
+  "eval_count": 18,
+  "eval_duration": 52479709
+}
+we want the following:
+- total_duration
+- load_duration
+- prompt_eval_count
+- prompt_eval_duration
+- eval_count
+- eval_duration
+
+
+## Version. - done
+need to add a version flag that prints the current version of ollm
+
+
+## Local CI/CD 
+I want a script I can run locally that will build ollm, package it for deployment and store the package in ./Deploy/{version}.  I want the package to be easily installable and uninstallable by the user.  They should be able to enter 'install-ollm' and it sets everything up for them.
+
+## trace
+can ollama stream the model's reasoning back to ollm so it can capture it in a trace?

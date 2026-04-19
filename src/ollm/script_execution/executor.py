@@ -68,7 +68,12 @@ class ScriptExecutor:
             logger.info("Script executor initialized successfully")
             
         except Exception as e:
-            logger.error(f"Failed to initialize script executor: {e}")
+            # Check if this is a Docker availability issue
+            error_msg = str(e).lower()
+            if 'docker' in error_msg and ('connection' in error_msg or 'no such file' in error_msg):
+                logger.debug(f"Failed to initialize script executor: {e}")
+            else:
+                logger.error(f"Failed to initialize script executor: {e}")
             await self.cleanup()
             raise OllmError(f"Script executor initialization failed: {e}")
     

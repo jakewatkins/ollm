@@ -1,0 +1,16 @@
+{
+  "name": "Sample Configuration",
+  "version": "1.0.0",
+  "settings": {
+    "debug": true,
+    "timeout": 30,
+    "servers": [
+      "localhost:8080",
+      "example.com:443"
+    ]
+  },
+  "features": {
+    "authentication": true,
+    "logging": false
+  }
+}

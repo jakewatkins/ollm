@@ -29,22 +29,64 @@ def resolve_install_directory() -> Path:
     if ollm_home:
         install_dir = Path(ollm_home).resolve()
     else:
-        # Use parent directory of running executable
-        executable_path = Path(sys.executable).resolve()
-        if executable_path.name == "python" or executable_path.stem.startswith("python"):
-            # We're in development mode or venv, check for ollm script
-            # Look for ollm in the same bin directory
-            bin_dir = executable_path.parent
-            ollm_script = bin_dir / "ollm"
-            if ollm_script.exists():
-                # We're in a venv with ollm installed, use venv parent
-                install_dir = bin_dir.parent.resolve()
+        # Check if we can determine location from sys.argv[0] (ollm script path)
+        argv0_path = Path(sys.argv[0]).resolve()
+        if argv0_path.name == "ollm" and argv0_path.exists():
+            # Running from ollm launcher script
+            script_parent = argv0_path.parent
+            
+            # Check if we're in a venv structure (e.g., ~/apps/ollm/venv/bin/ollm)
+            if (script_parent.name == "bin" and 
+                script_parent.parent.name == "venv" and 
+                (script_parent.parent / "pyvenv.cfg").exists()):
+                # We're in installation/venv/bin/ - go up to installation directory
+                install_dir = script_parent.parent.parent.resolve()
             else:
-                # Development mode, use current working directory
-                install_dir = Path.cwd().resolve()
+                # Regular ollm script - use its parent directory
+                install_dir = script_parent.resolve()
         else:
-            # Production - use parent of executable
-            install_dir = executable_path.parent.resolve()
+            # Use parent directory of running executable
+            executable_path = Path(sys.executable).resolve()
+            if executable_path.name == "python" or executable_path.stem.startswith("python"):
+                # We're in development mode or venv, check for ollm script
+                # Look for ollm in the same bin directory first
+                bin_dir = executable_path.parent
+                ollm_script = bin_dir / "ollm"
+                if ollm_script.exists():
+                    # We're in a venv with ollm installed, use venv parent
+                    install_dir = bin_dir.parent.resolve()
+                else:
+                    # Check if we're in a venv and ollm is in the venv's parent directory
+                    if bin_dir.name == "bin" and (bin_dir.parent / "pyvenv.cfg").exists():
+                        # We're in a venv, check parent directory for ollm script
+                        venv_parent = bin_dir.parent.parent
+                        ollm_script = venv_parent / "ollm"
+                        if ollm_script.exists():
+                            install_dir = venv_parent.resolve()
+                        else:
+                            # Try standard installation location as last resort
+                            standard_install = Path.home() / "apps" / "ollm"
+                            if standard_install.exists() and (standard_install / "ollm").exists():
+                                install_dir = standard_install.resolve()
+                            else:
+                                # Development mode fallback - use source directory if available
+                                cwd = Path.cwd().resolve()
+                                if (cwd / "src" / "ollm").exists() and (cwd / "pyproject.toml").exists():
+                                    install_dir = cwd
+                                else:
+                                    # Final fallback to current working directory
+                                    install_dir = cwd
+                    else:
+                        # Not in a venv, try standard paths
+                        standard_install = Path.home() / "apps" / "ollm"
+                        if standard_install.exists() and (standard_install / "ollm").exists():
+                            install_dir = standard_install.resolve()
+                        else:
+                            # Development mode, use current working directory
+                            install_dir = Path.cwd().resolve()
+            else:
+                # Production - use parent of executable
+                install_dir = executable_path.parent.resolve()
     
     if install_dir is None:
         raise InstallDirectoryError("Could not determine install directory")
@@ -119,7 +161,18 @@ def get_mcp_config_path() -> Path:
 
 
 def get_skills_directory() -> Path:
-    """Get path to skills directory."""
+    """Get path to skills directory.
+    
+    Resolution order:
+    1. Use OLLM_SKILLS_DIR environment variable if set
+    2. Use install directory + skills
+    """
+    # Check OLLM_SKILLS_DIR environment variable first
+    skills_dir_env = os.environ.get("OLLM_SKILLS_DIR")
+    if skills_dir_env:
+        return Path(skills_dir_env).expanduser().resolve()
+    
+    # Use install directory + skills
     return resolve_install_directory() / "skills"
 
 

@@ -2,16 +2,14 @@
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
 from typing_extensions import Annotated
 
+from . import __version__
 from .app import get_app
 from .errors import OllmError
-
-# Version is defined in pyproject.toml
-__version__ = "0.1.0"
 
 app = typer.Typer(
     name="ollm",
@@ -57,6 +55,10 @@ def main(
         bool,
         typer.Option("-v", "--verbose", help="Enable verbose output (shows secret warnings)")
     ] = False,
+    files: Annotated[
+        Optional[List[Path]],
+        typer.Option("-f", "--file", help="Attach text/markdown files to context")
+    ] = None,
     version: Annotated[
         Optional[bool],
         typer.Option("--version", callback=version_callback, help="Show version and exit")
@@ -75,7 +77,7 @@ def main(
     # Handle list models mode
     if list_models:
         # Validate that only -o can be combined with --listModels
-        if prompt is not None or prompt_file is not None or model is not None:
+        if prompt is not None or prompt_file is not None or model is not None or files is not None:
             print("Error: --listModels can only be combined with -o/--output flag.", file=sys.stderr)
             raise typer.Exit(1)
         
@@ -95,6 +97,10 @@ def main(
     
     # Get prompt content
     prompt_content = _get_prompt_content(prompt, prompt_file)
+    
+    # Append file attachments if provided
+    if files:
+        prompt_content = _append_file_attachments(prompt_content, files)
     
     # Process the prompt
     try:
@@ -135,3 +141,74 @@ def _get_prompt_content(prompt: Optional[str], prompt_file: Optional[Path]) -> s
         except Exception as e:
             print(f"Error reading from stdin: {e}", file=sys.stderr)
             raise typer.Exit(1)
+
+
+def _append_file_attachments(prompt_content: str, files: List[Path]) -> str:
+    """Append file attachments to prompt content.
+    
+    Args:
+        prompt_content: Original user prompt
+        files: List of file paths to attach
+        
+    Returns:
+        Enhanced prompt with file attachments
+        
+    Raises:
+        typer.Exit: On file reading errors
+    """
+    if not files:
+        return prompt_content
+    
+    # Define supported file extensions
+    supported_extensions = {".txt", ".md", ".markdown", ".json", ".yaml", ".yml"}
+    
+    # Start building the enhanced prompt
+    enhanced_prompt = prompt_content
+    
+    # Add separator and header
+    enhanced_prompt += "\n\n---\n\n**Attached Files:**\n\n"
+    
+    # Process each file
+    processed_files = 0
+    for file_path in files:
+        try:
+            # Validate file type
+            if file_path.suffix.lower() not in supported_extensions:
+                print(f"Warning: Skipping unsupported file type: {file_path}", file=sys.stderr)
+                continue
+            
+            # Check if file exists and is readable
+            if not file_path.exists():
+                print(f"Error: File not found: {file_path}", file=sys.stderr)
+                raise typer.Exit(1)
+            
+            if not file_path.is_file():
+                print(f"Error: Path is not a file: {file_path}", file=sys.stderr)
+                raise typer.Exit(1)
+            
+            # Read file content
+            content = file_path.read_text(encoding="utf-8")
+            
+            # Add file section
+            enhanced_prompt += f"**{file_path.name}:**\n```\n{content}\n```\n\n"
+            processed_files += 1
+            
+        except FileNotFoundError:
+            print(f"Error: File not found: {file_path}", file=sys.stderr)
+            raise typer.Exit(1)
+        except PermissionError:
+            print(f"Error: Permission denied reading file: {file_path}", file=sys.stderr)
+            raise typer.Exit(1)
+        except UnicodeDecodeError:
+            print(f"Error: File is not valid UTF-8 text: {file_path}", file=sys.stderr)
+            raise typer.Exit(1)
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}", file=sys.stderr)
+            raise typer.Exit(1)
+    
+    # If no files were processed, return original prompt
+    if processed_files == 0:
+        print("Warning: No supported files were attached", file=sys.stderr)
+        return prompt_content
+    
+    return enhanced_prompt

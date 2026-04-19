@@ -26,6 +26,13 @@
 - **Error Handling**: Graceful error management with clear user feedback
 - **Cross-Platform**: Native support for macOS, Linux, and Windows
 
+### 🔐 **Secure Secrets Management**
+- **Azure Key Vault Integration**: Secure storage and retrieval of API keys and credentials
+- **Pattern-Based References**: Use `{SecretName:default}` syntax across all configuration files
+- **Transparent Processing**: Automatic secret substitution in configs, MCP servers, and skills
+- **Graceful Fallbacks**: Default values when secrets are unavailable
+- **Memory Caching**: Efficient secret retrieval with in-memory caching
+
 ### 📊 **Quality & Testing**
 - **96% Test Coverage**: 42 passing tests covering unit, integration, and functional scenarios
 - **Manual Testing**: Comprehensive smoke test procedures for release validation
@@ -39,6 +46,7 @@
 - **Python 3.11+** 
 - **[Ollama](https://ollama.ai/)** running locally or accessible via network
 - **[Docker](https://docs.docker.com/get-docker/)** (optional, for script execution features)
+- **[Azure CLI](https://docs.microsoft.com/en-us/cli/azure/)** (optional, for Azure Key Vault secrets management)
 
 ### Installation
 
@@ -50,6 +58,11 @@ pip install git+https://github.com/yourusername/ollm.git
 git clone https://github.com/yourusername/ollm.git
 cd ollm
 pip install -e '.[dev]'
+
+# Install with Azure Key Vault support
+pip install -e '.[dev,azure]'
+# Or install Azure dependencies separately
+pip install azure-keyvault-secrets azure-identity
 ```
 
 ### Get Started in 30 Seconds
@@ -64,8 +77,14 @@ ollm -p "Explain quantum computing in simple terms" -m llama3.2:latest
 # List available models
 ollm --listModels
 
+# Check version
+ollm --version
+
 # Get help with writing
 ollm -p "Help me improve this email: 'Hey, can you fix the thing?'"
+
+# Debug mode with verbose output
+ollm --verbose -p "Test with detailed logging"
 ```
 
 ## 💡 Usage Examples
@@ -82,6 +101,9 @@ ollm -pf prompt.txt
 
 # Pipeline input
 echo "Summarize this text" | ollm
+
+# Check application version
+ollm --version
 ```
 
 ### Advanced Features
@@ -94,8 +116,11 @@ ollm -p "Explain machine learning" -o conversation.txt
 export OLLM_CONFIG=~/my-ollm-config.json
 ollm -p "Hello world"
 
-# Verbose mode for debugging
-ollm -p "Test question" -v
+# Verbose mode for debugging (shows secret warnings)
+ollm --verbose -p "Test question"
+
+# Clean output (default - hides secret warnings)
+ollm -p "Test question"
 
 # Custom log file
 ollm -p "Debug this" --log-file debug.log
@@ -130,6 +155,8 @@ ollm uses a flexible configuration system with multiple sources:
 ```json
 {
   "baseUrl": "http://localhost:11434",
+  "apiKey": "{OpenAIKey:fallback_api_key}",
+  "keyvault": "myAzureVault",
   "defaultModel": "llama3.2:latest",
   "agentLoop": {
     "maxTurns": 10,
@@ -147,6 +174,32 @@ ollm uses a flexible configuration system with multiple sources:
 }
 ```
 
+### Azure Key Vault Integration
+
+Securely manage API keys and secrets with Azure Key Vault:
+
+```json
+{
+  "keyvault": "myAzureVault",
+  "apiKey": "{OpenAIKey:default_key}",
+  "database": "{DatabaseUrl:sqlite://local.db}"
+}
+```
+
+**Secret Reference Pattern:**
+- `{SecretName}` - Required secret (fails if not found)
+- `{SecretName:default}` - Optional secret with fallback value
+
+**Prerequisites:**
+- Azure CLI installed and authenticated (`az login`)
+- Access to Azure Key Vault with appropriate permissions
+- Secrets stored in Key Vault with matching names
+
+**Supported Azure Authentication:**
+- Azure CLI credentials (recommended for development)
+- Managed Identity (recommended for production)
+- Service Principal (with client credentials)
+
 ### Environment Variables
 
 ```bash
@@ -158,6 +211,11 @@ export OLLM_HOME=/custom/install/dir
 
 # Skills directory override  
 export OLLM_SKILLS_DIR=/path/to/skills
+
+# Azure authentication (if not using az login)
+export AZURE_CLIENT_ID=your-client-id
+export AZURE_CLIENT_SECRET=your-client-secret  
+export AZURE_TENANT_ID=your-tenant-id
 ```
 
 ## 🎯 Skills System
@@ -241,6 +299,13 @@ ollm -p "Show me the user table schema"
 - **Path Validation**: All paths validated to be under user directories
 - **Environment Isolation**: Clean environment for script execution
 - **Error Sanitization**: Sensitive information filtered from error messages
+
+### Secrets Management Security
+- **Azure Key Vault**: Enterprise-grade secret storage with encryption at rest
+- **Memory-Only Caching**: Secrets cached in memory only, never persisted to disk
+- **Azure CLI Authentication**: No API keys stored in configuration files
+- **Graceful Degradation**: Application continues with defaults when secrets unavailable
+- **Audit Logging**: All secret access logged for security monitoring
 
 ## 🧪 Testing & Quality
 
@@ -361,17 +426,23 @@ mypy src/ollm/
 ### Troubleshooting
 
 ```bash
-# Debug configuration issues
-ollm -p "test" -v
+# Debug configuration issues (shows secret warnings)
+ollm --verbose -p "test"
 
 # Check model availability
 ollm --listModels
+
+# Check application version
+ollm --version
 
 # Test Docker integration
 docker ps
 
 # Verify MCP server connectivity
-ollm -p "list files" -v
+ollm --verbose -p "list files"
+
+# Test Azure Key Vault connectivity
+az keyvault secret list --vault-name myVault
 ```
 
 ### Common Issues
@@ -380,6 +451,9 @@ ollm -p "list files" -v
 - **Ollama connection failed**: Ensure `ollama serve` is running
 - **Docker permission denied**: Add user to docker group
 - **Model not found**: Pull model with `ollama pull model-name`
+- **Azure Key Vault access denied**: Run `az login` and verify vault permissions
+- **Secret not found**: Check secret name in Azure Key Vault matches config reference
+- **Too many secret warnings**: Use default mode (without `--verbose`) for clean output
 
 ## 📄 License
 
@@ -390,6 +464,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[Ollama](https://ollama.ai/)** for the excellent local LLM platform
 - **[Model Context Protocol](https://modelcontextprotocol.io/)** for the standardized tool integration
 - **[Docker](https://docker.com/)** for secure containerization
+- **[Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/)** for enterprise-grade secrets management
 - **Python ecosystem** for the robust development tools
 
 ---
