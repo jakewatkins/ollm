@@ -95,6 +95,16 @@ def parse_skill_md(skill_file: Path) -> Skill:
     
     # Create skill object
     skill_dir = skill_file.parent
+    
+    # Import secrets function locally to avoid circular imports
+    try:
+        from ..secrets import process_secrets_in_text
+        # Process secrets in instructions
+        instructions = process_secrets_in_text(instructions)
+    except ImportError:
+        # If secrets module not available, continue without processing
+        pass
+    
     skill = Skill(
         name=metadata.name,
         skill_dir=skill_dir,

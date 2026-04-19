@@ -1,0 +1,29 @@
+{
+  "servers": {
+    "google-search": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "google-search-mcp@latest"],
+      "env": {
+        "GOOGLE_SEARCH_API_KEY": "{GoogleSearchKey:fallback_key}",
+        "CUSTOM_SEARCH_ENGINE_ID": "{GoogleSearchEngineId}"
+      }
+    },
+    "github": {
+      "type": "stdio", 
+      "command": "npx",
+      "args": ["-y", "github-mcp@latest"],
+      "env": {
+        "GITHUB_TOKEN": "{GitHubToken:default_token}"
+      }
+    },
+    "database": {
+      "type": "http",
+      "url": "{DatabaseApiUrl:http://localhost:3000}",
+      "headers": {
+        "Authorization": "Bearer {DatabaseToken}",
+        "X-API-Key": "{ApiKey:fallback_api_key}"
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ class OllmApp:
     def __init__(self):
         self.config: Optional[Config] = None
         self.config_file: Optional[Path] = None
+        self.verbose: bool = False
         self.install_dir: Optional[Path] = None
         self.ollama_client: Optional[OllamaClient] = None
         self.mcp_client: Optional[McpClient] = None
@@ -50,7 +51,7 @@ class OllmApp:
             logger.info(f"Using install directory: {self.install_dir}")
             
             # Load configuration
-            self.config = load_config(self.config_file)
+            self.config = load_config(self.config_file, verbose=self.verbose)
             logger.info("Configuration loaded successfully")
             
             # Setup logging with loaded config

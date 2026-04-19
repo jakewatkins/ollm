@@ -10,11 +10,21 @@ from typing_extensions import Annotated
 from .app import get_app
 from .errors import OllmError
 
+# Version is defined in pyproject.toml
+__version__ = "0.1.0"
+
 app = typer.Typer(
     name="ollm",
     help="A command line tool that wraps Ollama HTTP endpoint with MCP servers and skills",
     no_args_is_help=False,  # Allow running without args to read from stdin
 )
+
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        print(f"ollm version {__version__}")
+        raise typer.Exit()
 
 
 @app.command()
@@ -43,6 +53,14 @@ def main(
         bool,
         typer.Option("--listModels", help="List available Ollama models (one per line)")
     ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option("-v", "--verbose", help="Enable verbose output (shows secret warnings)")
+    ] = False,
+    version: Annotated[
+        Optional[bool],
+        typer.Option("--version", callback=version_callback, help="Show version and exit")
+    ] = None,
 ) -> None:
     """Process a prompt using Ollama with MCP tools and skills support."""
     
@@ -51,6 +69,7 @@ def main(
     # Set custom config file if provided
     if config_file:
         ollm_app.config_file = config_file
+    ollm_app.verbose = verbose  # Pass verbose flag to app
     ollm_app.initialize()
     
     # Handle list models mode
