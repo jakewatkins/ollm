@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ollm"
-version = "0.1.0"
+version = "1.2.0"
 description = "A command line tool that wraps Ollama HTTP endpoint with MCP servers and skills"
 readme = "README.md"
 authors = [

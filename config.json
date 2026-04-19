@@ -1,10 +1,11 @@
 {
   "baseUrl": "http://localhost:11434",
-  "apiKey": "",
+  "apiKey": "{OllamaApiKey:default_ollama_key}",
+  "keyvault": "kvGPSecrets",
   "agentLoop": {
     "maxTurns": 8,
     "toolCallTimeoutSeconds": 60,
-    "requestTimeoutSeconds": 300
+    "requestTimeoutSeconds": 900
   },
   "logging": {
     "level": "debug",

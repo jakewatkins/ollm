@@ -16,7 +16,7 @@ from .mcp.config_schema import load_mcp_config
 from .model_selection import select_model
 from .ollama_client import OllamaClient
 from .output import write_output
-from .paths import resolve_install_directory
+from .paths import resolve_install_directory, get_skills_directory
 from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
 from .script_execution import ScriptExecutor, SkillAwareScriptTool
 
@@ -70,7 +70,7 @@ class OllmApp:
             asyncio.run(self._async_init_mcp())
             
             # Initialize skills system
-            skills_dir = self.install_dir / "skills"
+            skills_dir = get_skills_directory()
             self.skill_loader = SkillLoader(self.config, skills_dir)
             self.skill_selector = SkillSelector(self.config)
             self.skill_context_builder = SkillContextBuilder()
@@ -85,8 +85,14 @@ class OllmApp:
                 else:
                     logger.info("Script execution disabled in configuration")
             except Exception as e:
-                logger.error(f"Failed to initialize script execution: {e}")
-                logger.info("Continuing without script execution capabilities")
+                # Check if this is a Docker availability issue
+                error_msg = str(e).lower()
+                if 'docker' in error_msg and ('connection' in error_msg or 'no such file' in error_msg):
+                    logger.debug(f"Docker not available, script execution disabled: {e}")
+                    logger.info("Script execution disabled (Docker not available)")
+                else:
+                    logger.error(f"Failed to initialize script execution: {e}")
+                    logger.info("Continuing without script execution capabilities")
                 self.script_executor = None
             
             # Initialize agent loop
