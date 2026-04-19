@@ -20,7 +20,7 @@ from .paths import resolve_install_directory, get_skills_directory
 from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
 from .script_execution import ScriptExecutor, SkillAwareScriptTool
 
-logger = get_logger(__name__)
+# Note: logger created after setup_logging() is called
 
 
 class OllmApp:
@@ -46,16 +46,19 @@ class OllmApp:
             typer.Exit: On initialization errors
         """
         try:
-            # Resolve install directory
+            # Resolve install directory first
             self.install_dir = resolve_install_directory()
-            logger.info(f"Using install directory: {self.install_dir}")
             
             # Load configuration
             self.config = load_config(self.config_file, verbose=self.verbose)
-            logger.info("Configuration loaded successfully")
             
-            # Setup logging with loaded config
+            # Setup logging immediately after config is loaded
             setup_logging(self.config.logging)
+            
+            # Now we can safely create and use the logger
+            logger = get_logger(__name__)
+            logger.info(f"Using install directory: {self.install_dir}")
+            logger.info("Configuration loaded successfully")
             logger.info("Logging initialized")
             
             # Initialize Ollama client
@@ -138,6 +141,8 @@ class OllmApp:
         """
         if not self.config or not self.ollama_client or not self.agent_loop:
             raise OllmError("Application not initialized")
+
+        logger = get_logger(__name__)
         
         # Get available MCP servers for skill selection
         available_mcp_servers = []
@@ -233,6 +238,8 @@ class OllmApp:
         """
         if not self.config or not self.ollama_client:
             raise OllmError("Application not initialized")
+
+        logger = get_logger(__name__)
         
         logger.info("Listing available models", extra={
             "output_file": str(output_file) if output_file else None

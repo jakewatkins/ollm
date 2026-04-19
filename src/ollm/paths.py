@@ -32,8 +32,18 @@ def resolve_install_directory() -> Path:
         # Check if we can determine location from sys.argv[0] (ollm script path)
         argv0_path = Path(sys.argv[0]).resolve()
         if argv0_path.name == "ollm" and argv0_path.exists():
-            # Running from ollm launcher script - use its parent directory
-            install_dir = argv0_path.parent.resolve()
+            # Running from ollm launcher script
+            script_parent = argv0_path.parent
+            
+            # Check if we're in a venv structure (e.g., ~/apps/ollm/venv/bin/ollm)
+            if (script_parent.name == "bin" and 
+                script_parent.parent.name == "venv" and 
+                (script_parent.parent / "pyvenv.cfg").exists()):
+                # We're in installation/venv/bin/ - go up to installation directory
+                install_dir = script_parent.parent.parent.resolve()
+            else:
+                # Regular ollm script - use its parent directory
+                install_dir = script_parent.resolve()
         else:
             # Use parent directory of running executable
             executable_path = Path(sys.executable).resolve()
