@@ -148,6 +148,16 @@ class SkillLoader:
                 
                 # Load file content
                 content = resource_file.read_text(encoding='utf-8')
+                
+                # Import secrets function locally to avoid circular imports
+                try:
+                    from ..secrets import process_secrets_in_text
+                    # Process secrets in resource file content
+                    content = process_secrets_in_text(content)
+                except ImportError:
+                    # If secrets module not available, continue without processing
+                    pass
+                
                 loaded_resources[resource_path] = content
                 total_size += file_size
                 

@@ -100,6 +100,7 @@ class Config(BaseModel):
     """Main configuration for ollm."""
     base_url: str = Field(..., alias="baseUrl", description="Base URL for Ollama server")
     api_key: Optional[str] = Field(default=None, alias="apiKey", description="API key for Ollama")
+    keyvault: Optional[str] = Field(default=None, description="Azure Key Vault name for secrets")
     agent_loop: AgentLoopConfig = Field(default_factory=AgentLoopConfig, alias="agentLoop")
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
@@ -136,11 +137,12 @@ def get_api_key(config: Config) -> Optional[str]:
     return None
 
 
-def load_config(config_path: Optional[Path] = None) -> Config:
+def load_config(config_path: Optional[Path] = None, verbose: bool = False) -> Config:
     """Load configuration from config JSON file.
     
     Args:
         config_path: Optional path to config file. If None, uses default location.
+        verbose: Whether to show secret warnings to console
     
     Returns:
         Loaded configuration object
@@ -170,6 +172,16 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         )
     
     try:
+        # Import secrets functions locally to avoid circular imports
+        from .secrets import initialize_secrets_manager, process_secrets_in_dict
+        
+        # Initialize secrets manager if keyvault is specified
+        keyvault_name = config_data.get('keyvault')
+        initialize_secrets_manager(keyvault_name, verbose=verbose)
+        
+        # Process secrets in config data
+        config_data = process_secrets_in_dict(config_data)
+        
         return Config(**config_data)
     except Exception as e:
         raise ConfigurationError(

@@ -1,6 +1,7 @@
 {
   "baseUrl": "http://localhost:11434",
   "apiKey": "",
+  "keyvault": "kvGPSecrets",
   "agentLoop": {
     "maxTurns": 8,
     "toolCallTimeoutSeconds": 60,

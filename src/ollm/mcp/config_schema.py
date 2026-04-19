@@ -143,6 +143,12 @@ def load_mcp_config(install_dir: Path) -> Optional[McpConfig]:
         with open(mcp_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
+        # Import secrets function locally to avoid circular imports
+        from ..secrets import process_secrets_in_dict
+        
+        # Process secrets in MCP configuration
+        data = process_secrets_in_dict(data)
+        
         return McpConfig(**data)
     
     except json.JSONDecodeError as e:
