@@ -83,6 +83,9 @@ ollm --version
 # Get help with writing
 ollm -p "Help me improve this email: 'Hey, can you fix the thing?'"
 
+# Attach files for context-aware analysis
+ollm -p "Review this code for best practices" -f script.py
+
 # Debug mode with verbose output
 ollm --verbose -p "Test with detailed logging"
 ```
@@ -105,6 +108,35 @@ echo "Summarize this text" | ollm
 # Check application version
 ollm --version
 ```
+
+### 📎 **File Attachments**
+
+Attach files directly to your prompts for context-aware analysis:
+
+```bash
+# Attach single file
+ollm -p "Review this code" -f script.py
+
+# Attach multiple files
+ollm -p "Compare these configurations" -f config1.yaml -f config2.json
+
+# Combine prompt file with attachments
+ollm -pf analysis-prompt.txt -f data.md -f results.json
+
+# Save analysis to output file
+ollm -p "Analyze this markdown" -f document.md -o analysis-results.txt
+```
+
+**Supported File Types:**
+- Text files (`.txt`)
+- Markdown (`.md`, `.markdown`) 
+- Configuration files (`.json`, `.yaml`, `.yml`)
+
+**Features:**
+- ✅ Multiple file attachments in single command
+- ✅ Automatic file content formatting with syntax highlighting
+- ✅ Smart error handling for missing or unreadable files
+- ✅ File size validation and encoding detection
 
 ### Advanced Features
 
@@ -141,14 +173,20 @@ ollm -p "Make this email more professional: Hey, need the report ASAP"
 
 ## ⚙️ Configuration
 
-ollm uses a flexible configuration system with multiple sources:
+ollm uses a flexible configuration system with multiple sources and **automatic path resolution**:
 
 ### Configuration Priority Order
 1. **Command-line flags** (highest priority)
 2. **OLLM_CONFIG environment variable**
-3. **Install directory config.json**  
+3. **Install directory config.json** (automatically detected)
 4. **Home directory config.json**
 5. **Packaged defaults** (fallback)
+
+**✅ Improved Path Resolution:**
+- Configurations and skills are automatically loaded from installation directory
+- Works correctly with both direct installations and virtual environments
+- No need to run from specific directory - works from anywhere
+- Logs written to `~/apps/ollm/logs/` (not in current directory)
 
 ### Configuration File Example
 
@@ -216,6 +254,48 @@ export OLLM_SKILLS_DIR=/path/to/skills
 export AZURE_CLIENT_ID=your-client-id
 export AZURE_CLIENT_SECRET=your-client-secret  
 export AZURE_TENANT_ID=your-tenant-id
+```
+
+## 🖥️ Command Line Reference
+
+### Core Options
+
+```bash
+ollm [OPTIONS]
+
+Options:
+  -p, --prompt TEXT          Prompt text to send to the model
+  -pf, --prompt-file PATH    File containing the prompt text
+  -f, --file PATH            Attach text/markdown files to context (can be used multiple times)
+  -o, --output PATH          Output file path (default: stdout)
+  -m, --model TEXT           Ollama model name to use
+  -c, --config PATH          Configuration file path
+  -v, --verbose              Enable verbose output (shows secret warnings)
+  --listModels              List available Ollama models (one per line)
+  --version                 Show version and exit
+  --help                    Show help message and exit
+```
+
+### Usage Patterns
+
+```bash
+# Read prompt from stdin
+echo "Your prompt here" | ollm
+
+# Use prompt from command line
+ollm -p "Your prompt here"
+
+# Read prompt from file
+ollm -pf prompt.txt
+
+# Multiple file attachments
+ollm -p "Analyze these files" -f file1.md -f file2.json
+
+# Custom model and output
+ollm -p "Explain AI" -m llama3.2:latest -o explanation.txt
+
+# Verbose debugging
+ollm --verbose -p "Debug this issue"
 ```
 
 ## 🎯 Skills System
@@ -405,6 +485,9 @@ mypy src/ollm/
 - ✅ Skills system with automatic selection
 - ✅ Secure Docker-based script execution
 - ✅ Comprehensive configuration management
+- ✅ **File attachment system** with multi-format support
+- ✅ **Enhanced path resolution** for installation directory detection
+- ✅ **Robust logging** with proper directory management
 - ✅ Production-quality error handling and logging
 - ✅ **96% test coverage** with 42 passing tests
 
@@ -447,13 +530,25 @@ az keyvault secret list --vault-name myVault
 
 ### Common Issues
 
-- **Config not found**: Set `OLLM_CONFIG` environment variable
+- **Config not found**: Set `OLLM_CONFIG` environment variable or check install directory
+- **Skills not loading**: Skills are auto-detected from installation directory (`~/apps/ollm/skills/`)
+- **Logs missing**: Check `~/apps/ollm/logs/` directory (auto-created)
 - **Ollama connection failed**: Ensure `ollama serve` is running
 - **Docker permission denied**: Add user to docker group
 - **Model not found**: Pull model with `ollama pull model-name`
+- **File attachment error**: Check file exists and has supported extension (.txt, .md, .json, .yaml)
 - **Azure Key Vault access denied**: Run `az login` and verify vault permissions
 - **Secret not found**: Check secret name in Azure Key Vault matches config reference
 - **Too many secret warnings**: Use default mode (without `--verbose`) for clean output
+
+### Path Resolution
+
+✅ **Automatic Installation Detection**: ollm automatically finds its installation directory and loads:
+- Configuration files from `~/apps/ollm/config.json` 
+- Skills from `~/apps/ollm/skills/`
+- Writes logs to `~/apps/ollm/logs/`
+
+Works correctly whether installed via pip, from source, or in virtual environments.
 
 ## 📄 License
 
