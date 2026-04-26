@@ -1,6 +1,6 @@
 {
   "baseUrl": "http://localhost:11434",
-  "apiKey": "{OllamaApiKey:default_ollama_key}",
+  "apiKey": "",
   "keyvault": "kvGPSecrets",
   "agentLoop": {
     "maxTurns": 8,
@@ -33,5 +33,9 @@
       "memoryLimit": "128m",
       "cpuLimit": 0.5
     }
+  },
+  "telemetry": {
+    "SendTelemetry": true,
+    "NewRelicTimeOut": 3
   }
 }

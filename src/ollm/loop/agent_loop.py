@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from typing import Dict, List, Any, Optional
 
 from ..config import AgentLoopConfig
@@ -10,6 +11,7 @@ from ..logging_setup import get_logger
 from ..mcp.client import McpClient, McpTool
 from ..mcp.tool_adapter import convert_mcp_tools_to_ollama
 from ..ollama_client import OllamaClient
+from ..telemetry import get_telemetry_manager
 from .timeouts import with_timeout, Timer, TimeoutError
 
 logger = get_logger(__name__)
@@ -165,12 +167,49 @@ class AgentLoop:
         """
         # Note: Real Ollama tools support depends on the model and Ollama version
         # Pass tools to enable script execution and other MCP tools
-        return await asyncio.to_thread(
+        
+        # Make the chat request
+        response = await asyncio.to_thread(
             self.ollama_client.chat,
             model=model,
             messages=messages,
             tools=tools
         )
+        
+        # Record telemetry for the inference
+        telemetry = get_telemetry_manager()
+        if telemetry:
+            # Get the last user message for token counting
+            user_message = ""
+            assistant_message = ""
+            
+            for msg in reversed(messages):
+                if msg.get("role") == "user" and not user_message:
+                    user_message = msg.get("content", "")
+                elif msg.get("role") == "assistant" and not assistant_message:
+                    assistant_message = msg.get("content", "")
+                if user_message and assistant_message:
+                    break
+            
+            # Get assistant response content
+            if "message" in response:
+                assistant_response = response["message"].get("content", "")
+            else:
+                assistant_response = ""
+            
+            # Record telemetry for inference
+            telemetry = get_telemetry_manager()
+            if telemetry:
+                await telemetry.record_inference(
+                    model=model,
+                    prompt_text=user_message,
+                    response_text=assistant_response,
+                    ollama_data=response,
+                    start_time=self.timer.start_time,
+                    end_time=time.time()
+                )
+        
+        return response
     
     async def _process_tool_calls(
         self,
@@ -190,9 +229,26 @@ class AgentLoop:
             tool_arguments = tool_call.get("function", {}).get("arguments", {})
             call_id = tool_call.get("id", "unknown")
             
+            tool_start_time = time.time()
+            success = False
+            error_message = None
+            
             if not tool_name:
                 logger.error("Tool call missing function name", extra={"tool_call": tool_call})
-                self._add_tool_error_result(messages, call_id, "Tool call missing function name")
+                error_message = "Tool call missing function name"
+                self._add_tool_error_result(messages, call_id, error_message)
+                
+                # Record telemetry for failed tool call
+                telemetry = get_telemetry_manager()
+                if telemetry:
+                    duration_ms = int((time.time() - tool_start_time) * 1000)
+                    await telemetry.record_tool_call(
+                        tool_name="unknown",
+                        success=False,
+                        duration_ms=duration_ms,
+                        error_message=error_message
+                    )
+                
                 continue
             
             logger.debug(f"Calling tool '{tool_name}'", extra={
@@ -220,6 +276,7 @@ class AgentLoop:
                 
                 # Add successful result
                 self._add_tool_result(messages, call_id, result)
+                success = True
                 
                 logger.info(f"Tool call completed", extra={
                     "tool": tool_name,
@@ -227,12 +284,25 @@ class AgentLoop:
                 })
                 
             except TimeoutError as e:
+                error_message = str(e)
                 logger.error(f"Tool call timeout: {e}")
-                self._add_tool_error_result(messages, call_id, str(e))
+                self._add_tool_error_result(messages, call_id, error_message)
                 
             except Exception as e:
+                error_message = str(e)
                 logger.error(f"Tool call error: {e}")
-                self._add_tool_error_result(messages, call_id, str(e))
+                self._add_tool_error_result(messages, call_id, error_message)
+            
+            # Record telemetry for tool call
+            telemetry = get_telemetry_manager()
+            if telemetry:
+                duration_ms = int((time.time() - tool_start_time) * 1000)
+                await telemetry.record_tool_call(
+                    tool_name=tool_name or "unknown",
+                    success=success,
+                    duration_ms=duration_ms,
+                    error_message=error_message
+                )
     
     def _add_tool_result(
         self,

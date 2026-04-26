@@ -62,28 +62,48 @@ class SecretsManager:
             self.vault_accessible = False
     
     def test_vault_access(self) -> bool:
-        """Test access to the Key Vault at startup."""
-        if not self.client or not self.vault_accessible:
-            self._log_warning(f"Key Vault '{self.keyvault_name}' is not accessible. Secret references will fail unless defaults are provided.")
+        """Test access to the Key Vault at startup with retry logic."""
+        if not self.client:
+            self._log_warning(f"Key Vault '{self.keyvault_name}' client not initialized. Secret references will fail unless defaults are provided.")
             return False
             
-        try:
-            # Try to list secrets to test connectivity (without actually reading them)
-            list(self.client.list_properties_of_secrets())
-            logger.info(f"Successfully connected to Key Vault: {self.keyvault_name}")
+        # If we already know the vault is accessible, return quickly
+        if self.vault_accessible:
             return True
-        except ClientAuthenticationError:
-            self._log_warning(f"Authentication failed for Key Vault '{self.keyvault_name}'. Please ensure you're logged in with 'az login'.")
-            self.vault_accessible = False
-            return False
-        except HttpResponseError as e:
-            self._log_warning(f"Access denied to Key Vault '{self.keyvault_name}': {e}")
-            self.vault_accessible = False
-            return False
-        except Exception as e:
-            self._log_warning(f"Failed to connect to Key Vault '{self.keyvault_name}': {e}")
-            self.vault_accessible = False
-            return False
+            
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Try to list secrets to test connectivity
+                list(self.client.list_properties_of_secrets())
+                self.vault_accessible = True
+                logger.info(f"Successfully connected to Key Vault: {self.keyvault_name}")
+                return True
+                
+            except ClientAuthenticationError:
+                if attempt == max_retries - 1:
+                    self._log_warning(f"Authentication failed for Key Vault '{self.keyvault_name}' after {max_retries} attempts. Please ensure you're logged in with 'az login'.")
+                    self.vault_accessible = False
+                    return False
+                else:
+                    logger.debug(f"Authentication attempt {attempt + 1} failed for Key Vault '{self.keyvault_name}', retrying...")
+                    
+            except HttpResponseError as e:
+                self._log_warning(f"Access denied to Key Vault '{self.keyvault_name}': {e}")
+                self.vault_accessible = False
+                return False
+                
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    self._log_warning(f"Failed to connect to Key Vault '{self.keyvault_name}' after {max_retries} attempts: {e}")
+                    self.vault_accessible = False
+                    return False
+                else:
+                    logger.debug(f"Connection attempt {attempt + 1} failed for Key Vault '{self.keyvault_name}': {e}, retrying...")
+        
+        # This should never be reached, but just in case
+        self.vault_accessible = False
+        return False
     
     def get_secret(self, secret_name: str) -> Optional[str]:
         """Retrieve a secret from Azure Key Vault.

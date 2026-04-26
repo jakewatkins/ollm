@@ -1,0 +1,2 @@
+Please research the current state of Lilly's new weight loss drug Retatrutide.  Please provide me a summary of its latest clinical trials, expected approval data and market availability.  Also look at current gray market activity around Retatrutide, how is it being received?  How effective is it?  Are people have significant negative side effects?
+Please format the report in Markdown.

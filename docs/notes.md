@@ -203,7 +203,7 @@ Ollm's mcp and basic skills capabilities appear to work well.  Now I'd like to c
 Can you help me create this skill?
 
 
-## Add files to context
+## Add files to context - done
 Add a parameter on the command line that lets me attach text or markdown files to a context.
 the parameter will be -a or --attach and the file name
 like so:
@@ -213,6 +213,15 @@ ollm will append the file after the prompt like so:
 ```
 {$file_content}
 ```
+
+## Version. - done
+need to add a version flag that prints the current version of ollm
+
+## Local CI/CD - done
+I want a script I can run locally that will build ollm, package it for deployment and store the package in ./Deploy/{version}.  I want the package to be easily installable and uninstallable by the user.  They should be able to enter 'install-ollm' and it sets everything up for them.
+
+## trace
+can ollama stream the model's reasoning back to ollm so it can capture it in a trace?
 
 ## Memory
 I want to add memory to ollm so that we can build a personality.  The first layer will be remembering.
@@ -247,14 +256,3 @@ we want the following:
 - prompt_eval_duration
 - eval_count
 - eval_duration
-
-
-## Version. - done
-need to add a version flag that prints the current version of ollm
-
-
-## Local CI/CD 
-I want a script I can run locally that will build ollm, package it for deployment and store the package in ./Deploy/{version}.  I want the package to be easily installable and uninstallable by the user.  They should be able to enter 'install-ollm' and it sets everything up for them.
-
-## trace
-can ollama stream the model's reasoning back to ollm so it can capture it in a trace?

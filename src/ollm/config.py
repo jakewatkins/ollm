@@ -96,6 +96,15 @@ class ScriptExecutionConfig(BaseModel):
         validate_by_name = True
 
 
+class TelemetryConfig(BaseModel):
+    """Configuration for telemetry reporting."""
+    send_telemetry: bool = Field(default=False, alias="SendTelemetry", description="Enable telemetry reporting to New Relic")
+    new_relic_timeout: int = Field(default=3, alias="NewRelicTimeOut", ge=1, le=30, description="Timeout for New Relic API calls in seconds")
+    
+    class Config:
+        validate_by_name = True
+
+
 class Config(BaseModel):
     """Main configuration for ollm."""
     base_url: str = Field(..., alias="baseUrl", description="Base URL for Ollama server")
@@ -105,6 +114,7 @@ class Config(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     script_execution: ScriptExecutionConfig = Field(default_factory=ScriptExecutionConfig, alias="scriptExecution")
+    telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     
     class Config:
         validate_by_name = True

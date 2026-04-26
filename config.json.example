@@ -23,5 +23,9 @@
       "maxFileSizeKB": 64,
       "maxTotalSizeKB": 256
     }
+  },
+  "telemetry": {
+    "SendTelemetry": false,
+    "NewRelicTimeOut": 3
   }
 }

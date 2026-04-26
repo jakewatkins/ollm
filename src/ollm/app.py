@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -17,8 +18,10 @@ from .model_selection import select_model
 from .ollama_client import OllamaClient
 from .output import write_output
 from .paths import resolve_install_directory, get_skills_directory
+from .secrets import SecretsManager
 from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
 from .script_execution import ScriptExecutor, SkillAwareScriptTool
+from .telemetry import initialize_telemetry, get_telemetry_manager, cleanup_telemetry
 
 # Note: logger created after setup_logging() is called
 
@@ -38,6 +41,7 @@ class OllmApp:
         self.skill_selector: Optional[SkillSelector] = None
         self.skill_context_builder: Optional[SkillContextBuilder] = None
         self.script_executor: Optional[ScriptExecutor] = None
+        self.secrets_manager: Optional[SecretsManager] = None
     
     def initialize(self) -> None:
         """Initialize the application.
@@ -64,6 +68,16 @@ class OllmApp:
             # Initialize Ollama client
             self.ollama_client = OllamaClient(self.config)
             logger.info("Ollama client initialized")
+            
+            # Initialize secrets manager for telemetry
+            if self.config.keyvault:
+                self.secrets_manager = SecretsManager(self.config.keyvault, verbose=self.verbose)
+                if self.secrets_manager:
+                    self.secrets_manager.test_vault_access()
+            
+            # Initialize telemetry
+            initialize_telemetry(self.config, self.secrets_manager)
+            logger.info("Telemetry initialized")
             
             # Load MCP configuration and initialize client
             mcp_config = load_mcp_config(self.install_dir)
@@ -116,6 +130,28 @@ class OllmApp:
             print(f"Initialization Error: {e}", file=sys.stderr)
             raise typer.Exit(1)
     
+    async def _cleanup_resources(self) -> None:
+        """Cleanup application resources."""
+        try:
+            # Cleanup telemetry
+            await cleanup_telemetry()
+            
+            # Close MCP client
+            if self.mcp_client:
+                await self.mcp_client.close_all()
+            
+            # Close Ollama client
+            if self.ollama_client:
+                self.ollama_client.close()
+                
+        except Exception as e:
+            logger = get_logger(__name__)
+            logger.error(f"Error during cleanup: {e}")
+    
+    def cleanup(self) -> None:
+        """Cleanup application resources (synchronous wrapper)."""
+        asyncio.run(self._cleanup_resources())
+    
     async def _async_init_mcp(self) -> None:
         """Initialize MCP connections asynchronously."""
         if self.mcp_client:
@@ -139,10 +175,44 @@ class OllmApp:
             model: Optional model name to use
             output_file: Optional output file path
         """
+        asyncio.run(self._async_process_prompt(prompt_content, model, output_file))
+    
+    async def _async_process_prompt(
+        self, 
+        prompt_content: str, 
+        model: Optional[str] = None,
+        output_file: Optional[Path] = None
+    ) -> None:
+        """Async implementation of process_prompt.
+        
+        Args:
+            prompt_content: The prompt to process
+            model: Optional model name to use
+            output_file: Optional output file path
+        """
+        asyncio.run(self._async_process_prompt(prompt_content, model, output_file))
+    
+    async def _async_process_prompt(
+        self, 
+        prompt_content: str, 
+        model: Optional[str] = None,
+        output_file: Optional[Path] = None
+    ) -> None:
+        """Async implementation of process_prompt.
+        
+        Args:
+            prompt_content: The prompt to process
+            model: Optional model name to use
+            output_file: Optional output file path
+        """
         if not self.config or not self.ollama_client or not self.agent_loop:
             raise OllmError("Application not initialized")
 
         logger = get_logger(__name__)
+        start_time = time.time()
+        
+        # Get telemetry manager
+        telemetry = get_telemetry_manager()
         
         # Get available MCP servers for skill selection
         available_mcp_servers = []
@@ -162,6 +232,9 @@ class OllmApp:
             selected_skill = None
             skill_context = []
             additional_tools = []
+            skill_start_time = time.time()
+            skill_success = False
+            skill_error = None
             
             if self.skill_loader and self.skill_selector and self.skill_context_builder:
                 available_skills = self.skill_loader.discover_skills()
@@ -172,31 +245,61 @@ class OllmApp:
                 )
                 
                 if selected_skill:
-                    skill_context = self.skill_context_builder.build_context(selected_skill)
-                    
-                    # Add script execution tools if skill supports it and executor is available
-                    if (selected_skill.metadata.scriptExecution and 
-                        self.script_executor and 
-                        self.script_executor.is_initialized()):
+                    try:
+                        skill_context = self.skill_context_builder.build_context(selected_skill)
+                        skill_success = True
                         
-                        # Create skill-aware script tool with resources
-                        script_tool = SkillAwareScriptTool(
-                            self.script_executor,
-                            selected_skill.name,
-                            selected_skill.resource_files
-                        )
+                        # Add script execution tools if skill supports it and executor is available
+                        if (selected_skill.metadata.scriptExecution and 
+                            self.script_executor and 
+                            self.script_executor.is_initialized()):
+                            
+                            # Create skill-aware script tool with resources
+                            script_tool = SkillAwareScriptTool(
+                                self.script_executor,
+                                selected_skill.name,
+                                selected_skill.resource_files
+                            )
+                            
+                            additional_tools.append(script_tool)
+                            
+                            logger.info(
+                                f"Added script execution tool for skill '{selected_skill.name}'",
+                                extra={
+                                    "skill_resources": len(selected_skill.resource_files),
+                                    "script_execution_enabled": True
+                                }
+                            )
                         
-                        additional_tools.append(script_tool)
+                        logger.info(f"Using skill: {selected_skill.name}")
                         
-                        logger.info(
-                            f"Added script execution tool for skill '{selected_skill.name}'",
-                            extra={
-                                "skill_resources": len(selected_skill.resource_files),
-                                "script_execution_enabled": True
-                            }
-                        )
-                    
-                    logger.info(f"Using skill: {selected_skill.name}")
+                        # Record skill usage telemetry
+                        if telemetry:
+                            skill_duration = int((time.time() - skill_start_time) * 1000)
+                            await telemetry.record_skill_usage(
+                                skill_name=selected_skill.name,
+                                success=True,
+                                duration_ms=skill_duration
+                            )
+                        
+                    except Exception as e:
+                        skill_error = str(e)
+                        logger.error(f"Failed to build skill context for '{selected_skill.name}': {e}")
+                        
+                        # Record failed skill usage telemetry
+                        if telemetry:
+                            skill_duration = int((time.time() - skill_start_time) * 1000)
+                            await telemetry.record_skill_usage(
+                                skill_name=selected_skill.name,
+                                success=False,
+                                duration_ms=skill_duration,
+                                error_message=skill_error
+                            )
+                        
+                        # Continue without skill context
+                        selected_skill = None
+                        skill_context = []
+                        additional_tools = []
                 else:
                     logger.debug("No skill selected for this prompt")
             
@@ -205,13 +308,11 @@ class OllmApp:
             
             # Run agent loop with skill context and additional tools
             logger.debug(f"Starting agent loop with model: {selected_model}")
-            response = asyncio.run(
-                self.agent_loop.run(
-                    selected_model, 
-                    prompt_content, 
-                    skill_context, 
-                    additional_tools
-                )
+            response = await self.agent_loop.run(
+                selected_model, 
+                prompt_content, 
+                skill_context, 
+                additional_tools
             )
             
             # Write output
