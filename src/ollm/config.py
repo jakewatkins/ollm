@@ -27,6 +27,7 @@ class LoggingConfig(BaseModel):
     format: str = Field(default="jsonl") 
     max_file_size_mb: int = Field(default=10, alias="maxFileSizeMB", ge=1)
     max_files: int = Field(default=5, alias="maxFiles", ge=1)
+    log_filename: Optional[str] = Field(default=None, alias="logFilename", description="Absolute path to log file")
     
     class Config:
         validate_by_name = True
@@ -105,6 +106,8 @@ class Config(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     script_execution: ScriptExecutionConfig = Field(default_factory=ScriptExecutionConfig, alias="scriptExecution")
+    enable_new_relic: bool = Field(default=True, alias="EnableNewRelic", description="Enable New Relic observability")
+    environment: str = Field(default="dev", description="Environment name for New Relic")
     
     class Config:
         validate_by_name = True

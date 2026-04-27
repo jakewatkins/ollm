@@ -2,6 +2,8 @@
 
 import asyncio
 import sys
+import time
+import traceback
 from pathlib import Path
 from typing import Optional
 
@@ -14,9 +16,11 @@ from .loop.agent_loop import AgentLoop
 from .mcp.client import McpClient
 from .mcp.config_schema import load_mcp_config
 from .model_selection import select_model
+from .newrelic_integration import initialize_new_relic, setup_error_tracking, get_session_manager, get_event_recorder
 from .ollama_client import OllamaClient
 from .output import write_output
 from .paths import resolve_install_directory, get_skills_directory
+from .secrets import SecretsManager
 from .skills import SkillLoader, SkillSelector, SkillContextBuilder, Skill
 from .script_execution import ScriptExecutor, SkillAwareScriptTool
 
@@ -38,6 +42,9 @@ class OllmApp:
         self.skill_selector: Optional[SkillSelector] = None
         self.skill_context_builder: Optional[SkillContextBuilder] = None
         self.script_executor: Optional[ScriptExecutor] = None
+        self.secrets_manager: Optional[SecretsManager] = None
+        self.session_manager: Optional['SessionManager'] = None
+        self.event_recorder: Optional['EventRecorder'] = None
     
     def initialize(self) -> None:
         """Initialize the application.
@@ -60,6 +67,20 @@ class OllmApp:
             logger.info(f"Using install directory: {self.install_dir}")
             logger.info("Configuration loaded successfully")
             logger.info("Logging initialized")
+            
+            # Initialize secrets manager for New Relic
+            self.secrets_manager = SecretsManager(self.config.keyvault, verbose=self.verbose)
+            
+            # Initialize New Relic integration
+            success, self.session_manager, self.event_recorder = initialize_new_relic(
+                self.config, self.secrets_manager
+            )
+            if success:
+                logger.info("New Relic integration initialized successfully")
+                # Setup global error tracking
+                setup_error_tracking()
+            else:
+                logger.info("New Relic integration not available")
             
             # Initialize Ollama client
             self.ollama_client = OllamaClient(self.config)
@@ -164,6 +185,9 @@ class OllmApp:
             additional_tools = []
             
             if self.skill_loader and self.skill_selector and self.skill_context_builder:
+                start_time = time.perf_counter()
+                event_recorder = get_event_recorder()
+                
                 available_skills = self.skill_loader.discover_skills()
                 selected_skill = self.skill_selector.select_skill(
                     prompt_content, 
@@ -173,6 +197,17 @@ class OllmApp:
                 
                 if selected_skill:
                     skill_context = self.skill_context_builder.build_context(selected_skill)
+                    duration_ms = int((time.perf_counter() - start_time) * 1000)
+                    
+                    # Record skills usage event
+                    if event_recorder:
+                        event_recorder.record_skills_usage(
+                            skill_name=selected_skill.name,
+                            skill_description=selected_skill.metadata.description,
+                            duration_ms=duration_ms,
+                            context_messages_count=len(skill_context),
+                            required_mcp_servers=selected_skill.metadata.requiredMcpServers
+                        )
                     
                     # Add script execution tools if skill supports it and executor is available
                     if (selected_skill.metadata.scriptExecution and 
@@ -224,9 +259,27 @@ class OllmApp:
             })
             
         except OllamaError as e:
+            # Record error event
+            event_recorder = get_event_recorder()
+            if event_recorder:
+                event_recorder.record_error(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_source="process_prompt",
+                    stack_trace=traceback.format_exc()
+                )
             logger.error(f"Ollama error: {e}")
             raise OllmError(f"Ollama error: {e}")
         except Exception as e:
+            # Record error event
+            event_recorder = get_event_recorder()
+            if event_recorder:
+                event_recorder.record_error(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_source="process_prompt",
+                    stack_trace=traceback.format_exc()
+                )
             logger.error(f"Unexpected error processing prompt: {e}")
             raise OllmError(f"Unexpected error: {e}")
     
@@ -260,9 +313,27 @@ class OllmApp:
             })
             
         except OllamaError as e:
+            # Record error event
+            event_recorder = get_event_recorder()
+            if event_recorder:
+                event_recorder.record_error(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_source="list_models",
+                    stack_trace=traceback.format_exc()
+                )
             logger.error(f"Ollama error listing models: {e}")
             raise OllmError(f"Failed to list models: {e}")
         except Exception as e:
+            # Record error event
+            event_recorder = get_event_recorder()
+            if event_recorder:
+                event_recorder.record_error(
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_source="list_models",
+                    stack_trace=traceback.format_exc()
+                )
             logger.error(f"Unexpected error listing models: {e}")
             raise OllmError(f"Unexpected error: {e}")
     

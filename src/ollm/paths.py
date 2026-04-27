@@ -58,32 +58,44 @@ def resolve_install_directory() -> Path:
                 else:
                     # Check if we're in a venv and ollm is in the venv's parent directory
                     if bin_dir.name == "bin" and (bin_dir.parent / "pyvenv.cfg").exists():
-                        # We're in a venv, check parent directory for ollm script
+                        # We're in a venv, check if the parent contains our project structure
                         venv_parent = bin_dir.parent.parent
-                        ollm_script = venv_parent / "ollm"
-                        if ollm_script.exists():
-                            install_dir = venv_parent.resolve()
+                        
+                        # Check if current working directory looks like our project root
+                        cwd = Path.cwd().resolve()
+                        if (cwd / "src" / "ollm").exists() and (cwd / "pyproject.toml").exists():
+                            # We're in development mode from project root
+                            install_dir = cwd
+                        elif (venv_parent / "src" / "ollm").exists() and (venv_parent / "pyproject.toml").exists():
+                            # Project is in venv parent directory
+                            install_dir = venv_parent
                         else:
-                            # Try standard installation location as last resort
-                            standard_install = Path.home() / "apps" / "ollm"
-                            if standard_install.exists() and (standard_install / "ollm").exists():
-                                install_dir = standard_install.resolve()
+                            # Check for ollm script in venv parent
+                            ollm_script = venv_parent / "ollm"
+                            if ollm_script.exists():
+                                install_dir = venv_parent.resolve()
                             else:
-                                # Development mode fallback - use source directory if available
-                                cwd = Path.cwd().resolve()
-                                if (cwd / "src" / "ollm").exists() and (cwd / "pyproject.toml").exists():
-                                    install_dir = cwd
+                                # Try standard installation location as last resort
+                                standard_install = Path.home() / "apps" / "ollm"
+                                if standard_install.exists() and (standard_install / "ollm").exists():
+                                    install_dir = standard_install.resolve()
                                 else:
                                     # Final fallback to current working directory
                                     install_dir = cwd
                     else:
-                        # Not in a venv, try standard paths
-                        standard_install = Path.home() / "apps" / "ollm"
-                        if standard_install.exists() and (standard_install / "ollm").exists():
-                            install_dir = standard_install.resolve()
+                        # Not in a venv, check current working directory for development
+                        cwd = Path.cwd().resolve()
+                        if (cwd / "src" / "ollm").exists() and (cwd / "pyproject.toml").exists():
+                            # We're in development mode
+                            install_dir = cwd
                         else:
-                            # Development mode, use current working directory
-                            install_dir = Path.cwd().resolve()
+                            # Try standard paths
+                            standard_install = Path.home() / "apps" / "ollm"
+                            if standard_install.exists() and (standard_install / "ollm").exists():
+                                install_dir = standard_install.resolve()
+                            else:
+                                # Development mode, use current working directory
+                                install_dir = Path.cwd().resolve()
             else:
                 # Production - use parent of executable
                 install_dir = executable_path.parent.resolve()

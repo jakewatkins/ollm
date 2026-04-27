@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 import uuid
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -10,6 +11,7 @@ from .docker_client import DockerClient, ExecutionResult
 from .container_manager import ContainerManager
 from ..config import ScriptExecutionConfig
 from ..errors import OllmError
+from ..newrelic_integration import get_event_recorder
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +114,10 @@ class ScriptExecutor:
         # Generate unique task ID
         task_id = str(uuid.uuid4())[:8]
         
+        # Start timing for New Relic event
+        start_time = time.perf_counter()
+        event_recorder = get_event_recorder()
+        
         logger.info(
             f"Starting script execution",
             extra={
@@ -135,6 +141,9 @@ class ScriptExecutor:
                 environment_vars=request.environment_vars or {}
             )
             
+            # Calculate execution duration
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            
             # Build response
             success = result.exit_code == 0 and not result.timed_out
             error_message = None
@@ -143,6 +152,19 @@ class ScriptExecutor:
                 error_message = f"Script execution timed out after {self.config.execution_timeout_seconds}s"
             elif result.exit_code != 0:
                 error_message = f"Script exited with code {result.exit_code}"
+            
+            # Record New Relic event
+            if event_recorder:
+                status = "success" if success else "failure"
+                event_recorder.record_script_execution(
+                    script_content=request.script_content,
+                    language=request.script_language,
+                    duration_ms=duration_ms,
+                    status=status,
+                    error_message=error_message,
+                    exit_code=result.exit_code,
+                    skill_context=request.skill_name
+                )
             
             response = ScriptExecutionResponse(
                 task_id=task_id,
@@ -162,13 +184,28 @@ class ScriptExecutor:
                     "task_id": task_id,
                     "success": success,
                     "execution_time": result.execution_time,
-                    "exit_code": result.exit_code
+                    "exit_code": result.exit_code,
+                    "duration_ms": duration_ms
                 }
             )
             
             return response
             
         except Exception as e:
+            # Calculate duration even for failures
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            
+            # Record failure event
+            if event_recorder:
+                event_recorder.record_script_execution(
+                    script_content=request.script_content,
+                    language=request.script_language,
+                    duration_ms=duration_ms,
+                    status="failure",
+                    error_message=str(e),
+                    skill_context=request.skill_name
+                )
+            
             logger.error(f"Script execution failed for task {task_id}: {e}")
             
             # Return error response

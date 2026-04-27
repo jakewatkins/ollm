@@ -4,6 +4,7 @@ import asyncio
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ import httpx
 
 from ..errors import OllmError
 from ..logging_setup import get_logger
+from ..newrelic_integration import get_event_recorder
 from .config_schema import McpConfig, StdioServerConfig, HttpServerConfig
 
 logger = get_logger(__name__)
@@ -285,18 +287,59 @@ class McpClient:
             "arguments": arguments
         })
         
+        # Record timing for New Relic event
+        start_time = time.perf_counter()
+        event_recorder = get_event_recorder()
+        
         try:
             result = await server.call_tool(tool_name, arguments)
+            
+            # Calculate duration and record success event
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            if event_recorder:
+                event_recorder.record_tool_call(
+                    tool_name=tool_name,
+                    duration_ms=duration_ms,
+                    status="success"
+                )
+            
             logger.info(f"MCP tool call completed", extra={
                 "tool": tool_name,
-                "server": tool.server_name
+                "server": tool.server_name,
+                "duration_ms": duration_ms
             })
             return result
             
         except Exception as e:
+            # Calculate duration and record failure event
+            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            
+            # Determine error type
+            error_type = "exception"
+            http_status_code = None
+            
+            if isinstance(e, httpx.HTTPStatusError):
+                error_type = "http_error"
+                http_status_code = e.response.status_code
+            elif isinstance(e, httpx.TimeoutException):
+                error_type = "timeout"
+            elif isinstance(e, httpx.ConnectError):
+                error_type = "connection_error"
+            
+            if event_recorder:
+                event_recorder.record_tool_call(
+                    tool_name=tool_name,
+                    duration_ms=duration_ms,
+                    status="failure",
+                    error_message=str(e),
+                    error_type=error_type,
+                    http_status_code=http_status_code
+                )
+            
             logger.error(f"MCP tool call failed", extra={
                 "tool": tool_name,
                 "server": tool.server_name,
-                "error": str(e)
+                "error": str(e),
+                "duration_ms": duration_ms
             })
             raise OllmError(f"Tool call failed for '{tool_name}': {e}")
