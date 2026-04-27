@@ -216,6 +216,9 @@ class NewRelicAgent:
         event['eventType'] = event_type
         event['timestamp'] = int(datetime.utcnow().timestamp() * 1000)
         
+        # Debug: Print the event being sent
+        print(f"🔍 Sending {event_type} event: {json.dumps(event, default=str, indent=2)}")
+        
         self._send_events([event])
     
     def send_log_event(self, log_data: Dict[str, Any]) -> None:
@@ -371,8 +374,9 @@ class EventRecorder:
     def record_inference(self, ollama_response: Dict[str, Any], model_name: Optional[str] = None) -> None:
         """Record inference metrics event."""
         event_data = self._get_base_event_data(model_name or ollama_response.get("model"))
-        event_data.update({
-            "eventType": "Inference",
+        
+        # Only include fields that have valid values (not None) and proper types
+        inference_fields = {
             "totalDurationNs": ollama_response.get("total_duration"),
             "loadDurationNs": ollama_response.get("load_duration"),
             "promptEvalCount": ollama_response.get("prompt_eval_count"),
@@ -382,7 +386,23 @@ class EventRecorder:
             "doneStatus": ollama_response.get("done"),
             "doneReason": ollama_response.get("done_reason"),
             "createdAt": ollama_response.get("created_at")
-        })
+        }
+        
+        # Filter out None values and ensure proper data types
+        for field_name, field_value in inference_fields.items():
+            if field_value is not None:
+                # Convert numeric fields to proper types
+                if field_name.endswith('Ns') or field_name.endswith('Count'):
+                    try:
+                        event_data[field_name] = int(field_value)
+                    except (ValueError, TypeError):
+                        # Skip invalid numeric values
+                        continue
+                elif field_name == "doneStatus":
+                    event_data[field_name] = bool(field_value)
+                else:
+                    # String fields
+                    event_data[field_name] = str(field_value)
         
         self._record_event("Inference", event_data)
     
