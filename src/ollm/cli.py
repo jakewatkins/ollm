@@ -1,6 +1,7 @@
 """Command line interface for ollm."""
 
 import sys
+import traceback
 from pathlib import Path
 from typing import Optional, List
 
@@ -10,6 +11,7 @@ from typing_extensions import Annotated
 from . import __version__
 from .app import get_app
 from .errors import OllmError
+from .newrelic_integration import get_event_recorder
 
 app = typer.Typer(
     name="ollm",
@@ -106,7 +108,28 @@ def main(
     try:
         ollm_app.process_prompt(prompt_content, model, output)
     except OllmError as e:
+        # Record error event
+        event_recorder = get_event_recorder()
+        if event_recorder:
+            event_recorder.record_error(
+                error_type=type(e).__name__,
+                error_message=str(e),
+                error_source="CLI",
+                stack_trace=traceback.format_exc()
+            )
         print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        # Record unexpected error event
+        event_recorder = get_event_recorder()
+        if event_recorder:
+            event_recorder.record_error(
+                error_type=type(e).__name__,
+                error_message=str(e),
+                error_source="CLI",
+                stack_trace=traceback.format_exc()
+            )
+        print(f"Unexpected error: {e}", file=sys.stderr)
         raise typer.Exit(1)
     finally:
         # Cleanup resources

@@ -9,6 +9,7 @@ import httpx
 from .config import Config, get_api_key
 from .errors import OllamaError
 from .logging_setup import get_logger
+from .newrelic_integration import get_event_recorder
 
 logger = get_logger(__name__)
 
@@ -143,9 +144,20 @@ class OllamaClient:
             response.raise_for_status()
             
             result = response.json()
+            
+            # Record inference event if metrics are available
+            event_recorder = get_event_recorder()
+            if event_recorder and result.get("done"):
+                try:
+                    event_recorder.record_inference(result, model_name=model)
+                except Exception as e:
+                    logger.warning(f"Failed to record inference event: {e}")
+            
             logger.info("Received chat response from Ollama", extra={
                 "model": model,
-                "done": result.get("done", False)
+                "done": result.get("done", False),
+                "total_duration_ns": result.get("total_duration"),
+                "eval_count": result.get("eval_count")
             })
             
             return result

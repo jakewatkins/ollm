@@ -387,6 +387,58 @@ ollm -p "Show me the user table schema"
 - **Graceful Degradation**: Application continues with defaults when secrets unavailable
 - **Audit Logging**: All secret access logged for security monitoring
 
+## 📊 Observability & Monitoring
+
+### Logging Infrastructure ✅
+- **Local Log Files**: Structured logging to rotating text files with date-based naming
+- **Configurable Formats**: Support for both human-readable and JSONL formats
+- **Log Rotation**: Automatic rotation with configurable size limits and retention
+- **Security Filtering**: Automatic redaction of sensitive information (API keys, passwords)
+
+### New Relic Integration 🚧
+- **Log Forwarding**: ✅ **Working** - Application logs automatically forwarded to New Relic Logs API
+- **HTTP API**: Direct integration using New Relic HTTP APIs (bypassing agent registration issues)
+- **Session Correlation**: Unique session IDs for tracking user interactions across events
+- **Configurable Verbosity**: Debug output controlled by `--verbose` flag
+
+### Current Limitations
+- **Custom Events**: ❌ **Not Working** - New Relic custom events for telemetry are not functional yet
+- **Future Enhancement**: Custom event tracking will be implemented in a future release
+
+### Configuration
+
+Add New Relic secrets to Azure Key Vault:
+```bash
+# Store New Relic credentials in Azure Key Vault
+az keyvault secret set --vault-name "your-vault" --name "NewRelicAPIKey" --value "your-api-key"
+az keyvault secret set --vault-name "your-vault" --name "NewRelicAccountId" --value "your-account-id"
+```
+
+Enable New Relic in configuration:
+```json
+{
+  "enable_new_relic": true,
+  "new_relic_api_key_secret": "NewRelicAPIKey",
+  "new_relic_account_id_secret": "NewRelicAccountId",
+  "keyvault": "your-azure-vault-name"
+}
+```
+
+### Monitoring Features
+
+**Available:**
+- ✅ **Application Logs**: All log messages forwarded to New Relic Logs
+- ✅ **Error Tracking**: Exception details and stack traces
+- ✅ **Security Events**: Failed authentication and access attempts
+- ✅ **Session Tracking**: Unique session IDs for correlation
+
+**Planned (Custom Events):**
+- 🔄 **Tool Call Metrics**: MCP tool execution timing and status
+- 🔄 **Skill Usage Analytics**: Skills utilization patterns and performance
+- 🔄 **Inference Metrics**: Model response times and token usage
+- 🔄 **Script Execution Telemetry**: Docker container performance and results
+- 🔄 **Error Analytics**: Detailed error categorization and trends
+
 ## 🧪 Testing & Quality
 
 ### Test Suite Coverage
