@@ -132,15 +132,23 @@ def setup_newrelic_logging() -> Optional[logging.Handler]:
         return None
         
     try:
-        # Create New Relic log handler
-        handler = newrelic.agent.NewRelicLogForwardingHandler()
+        # Create custom New Relic log handler using record_log_event API
+        handler = NewRelicLogHandler()
         handler.setLevel(logging.DEBUG)  # Forward all log levels
         
-        # Use secure formatter to sanitize logs
-        formatter = SecureFormatter(
-            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
+        # Use New Relic context formatter if available, otherwise use secure formatter
+        try:
+            formatter = newrelic.agent.NewRelicContextFormatter(
+                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+        except AttributeError:
+            # Fallback to secure formatter if NewRelicContextFormatter not available
+            formatter = SecureFormatter(
+                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+        
         handler.setFormatter(formatter)
         
         return handler
@@ -148,6 +156,54 @@ def setup_newrelic_logging() -> Optional[logging.Handler]:
         # Log warning but don't fail
         logging.getLogger(__name__).warning(f"Failed to setup New Relic logging: {e}")
         return None
+
+
+class NewRelicLogHandler(logging.Handler):
+    """Custom logging handler that forwards logs to New Relic using record_log_event API."""
+    
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a log record to New Relic.
+        
+        Args:
+            record: Log record to emit
+        """
+        try:
+            # Format the log record
+            message = self.format(record)
+            
+            # Create log event data
+            log_data = {
+                'message': message,
+                'level': record.levelname,
+                'logger': record.name,
+                'timestamp': record.created * 1000,  # Convert to milliseconds
+            }
+            
+            # Add extra fields if available
+            if hasattr(record, 'taskName') and record.taskName:
+                log_data['taskName'] = record.taskName
+                
+            # Add any extra attributes from the log record
+            for key, value in record.__dict__.items():
+                if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
+                             'filename', 'module', 'lineno', 'funcName', 'created', 
+                             'msecs', 'relativeCreated', 'thread', 'threadName', 
+                             'processName', 'process', 'getMessage', 'exc_info', 
+                             'exc_text', 'stack_info', 'message', 'taskName']:
+                    try:
+                        # Only add serializable values
+                        if isinstance(value, (str, int, float, bool, type(None))):
+                            log_data[key] = value
+                    except Exception:
+                        # Skip non-serializable values
+                        pass
+            
+            # Send to New Relic
+            newrelic.agent.record_log_event(log_data)
+            
+        except Exception:
+            # Silently ignore errors to avoid infinite recursion
+            pass
 
 
 def setup_logging(config: LoggingConfig) -> None:
