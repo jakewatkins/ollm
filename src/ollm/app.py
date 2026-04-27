@@ -73,7 +73,7 @@ class OllmApp:
             
             # Initialize New Relic integration
             success, self.session_manager, self.event_recorder = initialize_new_relic(
-                self.config, self.secrets_manager
+                self.config, self.secrets_manager, self.verbose
             )
             if success:
                 logger.info("New Relic integration initialized successfully")

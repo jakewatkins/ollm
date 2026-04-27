@@ -199,12 +199,14 @@ class NewRelicLogHandler(logging.Handler):
                         pass
             
             # Send to New Relic via HTTP API
-            print(f"📋 Forwarding log to New Relic: {record.levelname} - {message[:100]}...")
+            if self.agent.verbose:
+                print(f"📋 Forwarding log to New Relic: {record.levelname} - {message[:100]}...")
             self.agent.send_log_event(log_data)
             
         except Exception as e:
             # Print error for debugging but don't raise to avoid infinite recursion
-            print(f"⚠️ NewRelicLogHandler error: {e}")
+            if self.agent and self.agent.verbose:
+                print(f"❌ Failed to send log to New Relic: {e}")
 
 
 def setup_logging(config: LoggingConfig) -> None:
@@ -263,7 +265,8 @@ def set_newrelic_agent(agent):
     global _newrelic_log_handler
     if _newrelic_log_handler and agent:
         _newrelic_log_handler.set_agent(agent)
-        print("🔧 Set New Relic agent object on log handler")
+        if agent.verbose:
+            print("🔧 Set New Relic agent object on log handler")
 
 
 def get_logger(name: str) -> logging.Logger:

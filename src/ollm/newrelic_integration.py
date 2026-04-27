@@ -59,9 +59,10 @@ class SessionManager:
 class NewRelicAgent:
     """Direct New Relic HTTP API client for CLI applications."""
     
-    def __init__(self, config: Config, secrets_manager: SecretsManager):
+    def __init__(self, config: Config, secrets_manager: SecretsManager, verbose: bool = False):
         self.config = config
         self.secrets_manager = secrets_manager
+        self.verbose = verbose
         self.initialized = False
         self.enabled = config.enable_new_relic
         self.api_key = None
@@ -95,9 +96,10 @@ class NewRelicAgent:
                 logger.warning(f"New Relic secrets unavailable: {', '.join(missing)}. Continuing without New Relic.")
                 return False
             
-            print("🚀 Using New Relic Direct HTTP APIs (bypassing agent registration)")
-            print(f"🔑 API Key: {self.api_key[:4]}...{self.api_key[-4:]} ({len(self.api_key)} chars)")
-            print(f"🏢 Account ID: {self.account_id}")
+            if self.verbose:
+                print("🚀 Using New Relic Direct HTTP APIs (bypassing agent registration)")
+                print(f"🔑 API Key: {self.api_key[:4]}...{self.api_key[-4:]} ({len(self.api_key)} chars)")
+                print(f"🏢 Account ID: {self.account_id}")
             
             # Test connectivity to New Relic APIs
             self._test_connectivity()
@@ -120,7 +122,8 @@ class NewRelicAgent:
     def _test_connectivity(self) -> None:
         """Test connectivity to New Relic APIs."""
         try:
-            print("🌍 Testing New Relic API connectivity...")
+            if self.verbose:
+                print("🌍 Testing New Relic API connectivity...")
             
             # Test Events API
             events_url = self.events_url.format(self.account_id)
@@ -131,7 +134,8 @@ class NewRelicAgent:
             }]
             
             self._send_events(test_event)
-            print("✅ Events API connectivity test successful")
+            if self.verbose:
+                print("✅ Events API connectivity test successful")
             
             # Test Logs API  
             test_log = [{
@@ -142,10 +146,12 @@ class NewRelicAgent:
             }]
             
             self._send_logs(test_log)
-            print("✅ Logs API connectivity test successful")
+            if self.verbose:
+                print("✅ Logs API connectivity test successful")
             
         except Exception as e:
-            print(f"⚠️  API connectivity test failed: {e}")
+            if self.verbose:
+                print(f"⚠️  API connectivity test failed: {e}")
             # Don't fail initialization on connectivity test failure
     
     def _send_events(self, events: list) -> None:
@@ -170,12 +176,18 @@ class NewRelicAgent:
         
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
+                response_body = response.read().decode('utf-8')
                 if response.getcode() == 200:
-                    print(f"📡 Successfully sent {len(events)} events to New Relic")
+                    if self.verbose and len(events) > 0:
+                        print(f"📡 Successfully sent {len(events)} events to New Relic")
+                        print(f"📡 Response body: {response_body}")
                 else:
-                    print(f"⚠️  Events API returned status: {response.getcode()}")
+                    if self.verbose:
+                        print(f"⚠️  Events API returned status: {response.getcode()}")
+                        print(f"⚠️  Response body: {response_body}")
         except Exception as e:
-            print(f"❌ Failed to send events: {e}")
+            if self.verbose:
+                print(f"❌ Failed to send events: {e}")
     
     def _send_logs(self, logs: list) -> None:
         """Send logs to New Relic Logs API."""
@@ -204,11 +216,14 @@ class NewRelicAgent:
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.getcode() == 202:  # Logs API returns 202 Accepted
-                    print(f"📋 Successfully sent {len(logs)} logs to New Relic")
+                    if self.verbose and len(logs) > 0:
+                        print(f"📋 Successfully sent {len(logs)} logs to New Relic")
                 else:
-                    print(f"⚠️  Logs API returned status: {response.getcode()}")
+                    if self.verbose:
+                        print(f"⚠️  Logs API returned status: {response.getcode()}")
         except Exception as e:
-            print(f"❌ Failed to send logs: {e}")
+            if self.verbose:
+                print(f"❌ Failed to send logs: {e}")
     
     def send_custom_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
         """Send a single custom event to New Relic."""
@@ -216,8 +231,15 @@ class NewRelicAgent:
         event['eventType'] = event_type
         event['timestamp'] = int(datetime.utcnow().timestamp() * 1000)
         
-        # Debug: Print the event being sent
-        print(f"🔍 Sending {event_type} event: {json.dumps(event, default=str, indent=2)}")
+        # Debug: Print the raw event data before sending (if verbose)
+        if self.verbose:
+            print(f"🔍 Raw event data for {event_type}:")
+            for key, value in event_data.items():
+                print(f"   {key}: {value} (type: {type(value).__name__})")
+            
+            # Debug: Print the JSON that will be sent
+            json_data = json.dumps([event_data], indent=2)
+            print(f"🔍 JSON payload being sent: {json_data}")
         
         self._send_events([event])
     
@@ -288,8 +310,8 @@ class EventRecorder:
         """Get base event data common to all events."""
         return {
             "sessionId": self.session_manager.get_session_id(),
-            "modelName": model_name or "unknown",
-            "timestamp": datetime.utcnow().isoformat()
+            "modelName": model_name or "unknown"
+            # Note: timestamp is set in send_custom_event to avoid conflicts
         }
     
     def _record_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
@@ -299,7 +321,8 @@ class EventRecorder:
             return
             
         try:
-            print(f"📡 Recording {event_type} event: {event_data}")
+            if self.agent.verbose:
+                print(f"📡 Recording {event_type} event: {event_data}")
             self.agent.send_custom_event(event_type, event_data)
             
             logger.debug(f"Recorded {event_type} event to New Relic")
@@ -427,7 +450,7 @@ class EventRecorder:
         self._record_event("Error", event_data)
 
 
-def initialize_new_relic(config: Config, secrets_manager: SecretsManager) -> tuple[bool, Optional[SessionManager], Optional[EventRecorder]]:
+def initialize_new_relic(config: Config, secrets_manager: SecretsManager, verbose: bool = False) -> tuple[bool, Optional[SessionManager], Optional[EventRecorder]]:
     """Initialize New Relic integration components.
     
     Args:
@@ -445,7 +468,7 @@ def initialize_new_relic(config: Config, secrets_manager: SecretsManager) -> tup
             _session_manager.generate_session_id()
     
     # Initialize New Relic agent
-    agent = NewRelicAgent(config, secrets_manager)
+    agent = NewRelicAgent(config, secrets_manager, verbose)
     success = agent.initialize()
     
     with _recorder_lock:
@@ -454,7 +477,8 @@ def initialize_new_relic(config: Config, secrets_manager: SecretsManager) -> tup
     
     # Test the integration if successful
     if success and _event_recorder:
-        print("🔧 Testing New Relic integration with sample events...")
+        if verbose:
+            print("🔧 Testing New Relic integration with sample events...")
         try:
             # Test custom event
             _event_recorder._record_event("TestEvent", {
@@ -467,9 +491,11 @@ def initialize_new_relic(config: Config, secrets_manager: SecretsManager) -> tup
             test_logger = logging.getLogger("newrelic_test")
             test_logger.info("🧪 New Relic integration test log message")
             
-            print("✅ New Relic integration test completed successfully")
+            if verbose:
+                print("✅ New Relic integration test completed successfully")
         except Exception as e:
-            print(f"⚠️ New Relic integration test failed: {e}")
+            if verbose:
+                print(f"⚠️ New Relic integration test failed: {e}")
     
     return success, _session_manager, _event_recorder
 
