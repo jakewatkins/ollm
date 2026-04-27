@@ -9,14 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-try:
-    import newrelic.agent
-    NEW_RELIC_AVAILABLE = True
-except ImportError:
-    NEW_RELIC_AVAILABLE = False
-
 from .config import LoggingConfig
 from .paths import get_logs_directory
+
+# Global reference to NewRelic log handler for setting application object
+_newrelic_log_handler: Optional['NewRelicLogHandler'] = None
 
 
 class SecureFormatter(logging.Formatter):
@@ -123,31 +120,21 @@ def get_log_filename(config: LoggingConfig) -> Path:
 
 
 def setup_newrelic_logging() -> Optional[logging.Handler]:
-    """Setup New Relic log forwarding.
+    """Setup New Relic log forwarding using HTTP APIs.
     
     Returns:
         New Relic handler if available, None otherwise
     """
-    if not NEW_RELIC_AVAILABLE:
-        return None
-        
     try:
-        # Create custom New Relic log handler using record_log_event API
+        # Create custom New Relic log handler using HTTP APIs
         handler = NewRelicLogHandler()
         handler.setLevel(logging.DEBUG)  # Forward all log levels
         
-        # Use New Relic context formatter if available, otherwise use secure formatter
-        try:
-            formatter = newrelic.agent.NewRelicContextFormatter(
-                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-        except AttributeError:
-            # Fallback to secure formatter if NewRelicContextFormatter not available
-            formatter = SecureFormatter(
-                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
+        # Use secure formatter for New Relic logs
+        formatter = SecureFormatter(
+            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
         
         handler.setFormatter(formatter)
         
@@ -159,7 +146,15 @@ def setup_newrelic_logging() -> Optional[logging.Handler]:
 
 
 class NewRelicLogHandler(logging.Handler):
-    """Custom logging handler that forwards logs to New Relic using record_log_event API."""
+    """Custom logging handler that forwards logs to New Relic using HTTP APIs."""
+    
+    def __init__(self):
+        super().__init__()
+        self.agent = None
+        
+    def set_agent(self, agent):
+        """Set the New Relic agent object."""
+        self.agent = agent
     
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record to New Relic.
@@ -168,6 +163,10 @@ class NewRelicLogHandler(logging.Handler):
             record: Log record to emit
         """
         try:
+            # Skip if no agent
+            if not self.agent or not self.agent.is_enabled():
+                return
+                
             # Format the log record
             message = self.format(record)
             
@@ -176,7 +175,8 @@ class NewRelicLogHandler(logging.Handler):
                 'message': message,
                 'level': record.levelname,
                 'logger': record.name,
-                'timestamp': record.created * 1000,  # Convert to milliseconds
+                'timestamp': int(record.created * 1000),  # Convert to milliseconds
+                'service': 'OLLM'
             }
             
             # Add extra fields if available
@@ -198,12 +198,13 @@ class NewRelicLogHandler(logging.Handler):
                         # Skip non-serializable values
                         pass
             
-            # Send to New Relic
-            newrelic.agent.record_log_event(log_data)
+            # Send to New Relic via HTTP API
+            print(f"📋 Forwarding log to New Relic: {record.levelname} - {message[:100]}...")
+            self.agent.send_log_event(log_data)
             
-        except Exception:
-            # Silently ignore errors to avoid infinite recursion
-            pass
+        except Exception as e:
+            # Print error for debugging but don't raise to avoid infinite recursion
+            print(f"⚠️ NewRelicLogHandler error: {e}")
 
 
 def setup_logging(config: LoggingConfig) -> None:
@@ -240,9 +241,10 @@ def setup_logging(config: LoggingConfig) -> None:
     root_logger.addHandler(file_handler)
     
     # Add New Relic logging handler if available
-    newrelic_handler = setup_newrelic_logging()
-    if newrelic_handler:
-        root_logger.addHandler(newrelic_handler)
+    global _newrelic_log_handler
+    _newrelic_log_handler = setup_newrelic_logging()
+    if _newrelic_log_handler:
+        root_logger.addHandler(_newrelic_log_handler)
     
     # Also add console handler for development
     console_handler = logging.StreamHandler()
@@ -250,6 +252,18 @@ def setup_logging(config: LoggingConfig) -> None:
     console_formatter = TextFormatter()
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
+
+
+def set_newrelic_agent(agent):
+    """Set the New Relic agent object on the log handler.
+    
+    Args:
+        agent: New Relic agent object
+    """
+    global _newrelic_log_handler
+    if _newrelic_log_handler and agent:
+        _newrelic_log_handler.set_agent(agent)
+        print("🔧 Set New Relic agent object on log handler")
 
 
 def get_logger(name: str) -> logging.Logger:

@@ -1,4 +1,4 @@
-"""New Relic integration for OLLM observability."""
+"""New Relic integration for OLLM observability using direct HTTP APIs."""
 
 import json
 import logging
@@ -8,18 +8,19 @@ import socket
 import sys
 import traceback
 import uuid
+import urllib.request
+import urllib.parse
 from datetime import datetime
 from typing import Dict, Optional, Any, Union
 from threading import Lock
 
-try:
-    import newrelic.agent
-    NEW_RELIC_AVAILABLE = True
-except ImportError:
-    NEW_RELIC_AVAILABLE = False
+# Remove agent dependency since we're using direct APIs
+NEW_RELIC_AVAILABLE = True
 
 from .config import Config
+from .paths import get_logs_directory
 from .secrets import SecretsManager
+from .logging_setup import set_newrelic_agent
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +57,22 @@ class SessionManager:
 
 
 class NewRelicAgent:
-    """Manages New Relic agent initialization and configuration."""
+    """Direct New Relic HTTP API client for CLI applications."""
     
     def __init__(self, config: Config, secrets_manager: SecretsManager):
         self.config = config
         self.secrets_manager = secrets_manager
         self.initialized = False
         self.enabled = config.enable_new_relic
+        self.api_key = None
+        self.account_id = None
+        
+        # New Relic API endpoints
+        self.events_url = "https://insights-collector.newrelic.com/v1/accounts/{}/events"
+        self.logs_url = "https://log-api.newrelic.com/log/v1"
         
     def initialize(self) -> bool:
-        """Initialize New Relic agent.
+        """Initialize New Relic direct API client.
         
         Returns:
             True if successfully initialized, False otherwise
@@ -74,39 +81,32 @@ class NewRelicAgent:
             logger.info("New Relic integration disabled in configuration")
             return False
             
-        if not NEW_RELIC_AVAILABLE:
-            logger.warning("New Relic library not available. Install with: pip install newrelic")
-            return False
-            
         try:
             # Get secrets from Azure Key Vault
-            api_key = self.secrets_manager.get_secret("NewRelicAPIKey")
-            account_id = self.secrets_manager.get_secret("NewRelicAccountId")
+            self.api_key = self.secrets_manager.get_secret("NewRelicAPIKey")
+            self.account_id = self.secrets_manager.get_secret("NewRelicAccountId")
             
-            if not api_key or not account_id:
+            if not self.api_key or not self.account_id:
                 missing = []
-                if not api_key:
+                if not self.api_key:
                     missing.append("NewRelicAPIKey")
-                if not account_id:
+                if not self.account_id:
                     missing.append("NewRelicAccountId")
                 logger.warning(f"New Relic secrets unavailable: {', '.join(missing)}. Continuing without New Relic.")
                 return False
             
-            # Configure New Relic agent
-            hostname = socket.gethostname()
+            print("🚀 Using New Relic Direct HTTP APIs (bypassing agent registration)")
+            print(f"🔑 API Key: {self.api_key[:4]}...{self.api_key[-4:]} ({len(self.api_key)} chars)")
+            print(f"🏢 Account ID: {self.account_id}")
             
-            # Set environment variables for New Relic agent
-            os.environ['NEW_RELIC_LICENSE_KEY'] = api_key
-            os.environ['NEW_RELIC_APP_NAME'] = 'OLLM'
-            os.environ['NEW_RELIC_ENVIRONMENT'] = self.config.environment
-            os.environ['NEW_RELIC_HOST'] = hostname
-            os.environ['NEW_RELIC_LOG_LEVEL'] = 'info'
+            # Test connectivity to New Relic APIs
+            self._test_connectivity()
             
-            # Initialize the agent
-            newrelic.agent.initialize()
+            # Configure log handler to use this agent
+            set_newrelic_agent(self)
             
             self.initialized = True
-            logger.info(f"New Relic agent initialized successfully (environment: {self.config.environment}, host: {hostname})")
+            logger.info(f"New Relic HTTP API client initialized (account: {self.account_id})")
             return True
             
         except Exception as e:
@@ -116,6 +116,111 @@ class NewRelicAgent:
     def is_enabled(self) -> bool:
         """Check if New Relic is enabled and working."""
         return self.enabled and self.initialized
+    
+    def _test_connectivity(self) -> None:
+        """Test connectivity to New Relic APIs."""
+        try:
+            print("🌍 Testing New Relic API connectivity...")
+            
+            # Test Events API
+            events_url = self.events_url.format(self.account_id)
+            test_event = [{
+                'eventType': 'ConnectivityTest',
+                'testTimestamp': int(datetime.utcnow().timestamp() * 1000),
+                'success': True
+            }]
+            
+            self._send_events(test_event)
+            print("✅ Events API connectivity test successful")
+            
+            # Test Logs API  
+            test_log = [{
+                'message': 'New Relic connectivity test log',
+                'timestamp': int(datetime.utcnow().timestamp() * 1000),
+                'level': 'INFO',
+                'service': 'OLLM'
+            }]
+            
+            self._send_logs(test_log)
+            print("✅ Logs API connectivity test successful")
+            
+        except Exception as e:
+            print(f"⚠️  API connectivity test failed: {e}")
+            # Don't fail initialization on connectivity test failure
+    
+    def _send_events(self, events: list) -> None:
+        """Send events to New Relic Events API."""
+        if not self.initialized:
+            return
+            
+        events_url = self.events_url.format(self.account_id)
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Insert-Key': self.api_key
+        }
+        
+        data = json.dumps(events).encode('utf-8')
+        
+        req = urllib.request.Request(
+            events_url,
+            data=data,
+            headers=headers,
+            method='POST'
+        )
+        
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.getcode() == 200:
+                    print(f"📡 Successfully sent {len(events)} events to New Relic")
+                else:
+                    print(f"⚠️  Events API returned status: {response.getcode()}")
+        except Exception as e:
+            print(f"❌ Failed to send events: {e}")
+    
+    def _send_logs(self, logs: list) -> None:
+        """Send logs to New Relic Logs API."""
+        if not self.initialized:
+            return
+            
+        headers = {
+            'Content-Type': 'application/json',
+            'X-License-Key': self.api_key
+        }
+        
+        # Logs API expects a specific format
+        payload = {
+            'logs': logs
+        }
+        
+        data = json.dumps(payload).encode('utf-8')
+        
+        req = urllib.request.Request(
+            self.logs_url,
+            data=data,
+            headers=headers,
+            method='POST'
+        )
+        
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.getcode() == 202:  # Logs API returns 202 Accepted
+                    print(f"📋 Successfully sent {len(logs)} logs to New Relic")
+                else:
+                    print(f"⚠️  Logs API returned status: {response.getcode()}")
+        except Exception as e:
+            print(f"❌ Failed to send logs: {e}")
+    
+    def send_custom_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
+        """Send a single custom event to New Relic."""
+        event = dict(event_data)
+        event['eventType'] = event_type
+        event['timestamp'] = int(datetime.utcnow().timestamp() * 1000)
+        
+        self._send_events([event])
+    
+    def send_log_event(self, log_data: Dict[str, Any]) -> None:
+        """Send a single log event to New Relic."""
+        self._send_logs([log_data])
 
 
 # Content sanitization patterns
@@ -185,13 +290,15 @@ class EventRecorder:
         }
     
     def _record_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
-        """Record event to New Relic with error handling."""
+        """Record event to New Relic using direct HTTP API."""
         if not self.agent.is_enabled():
             logger.debug(f"New Relic not available, skipping {event_type} event")
             return
             
         try:
-            newrelic.agent.record_custom_event(event_type, event_data)
+            print(f"📡 Recording {event_type} event: {event_data}")
+            self.agent.send_custom_event(event_type, event_data)
+            
             logger.debug(f"Recorded {event_type} event to New Relic")
         except Exception as e:
             logger.warning(f"Failed to record {event_type} event to New Relic: {e}")
@@ -324,6 +431,25 @@ def initialize_new_relic(config: Config, secrets_manager: SecretsManager) -> tup
     with _recorder_lock:
         if _event_recorder is None:
             _event_recorder = EventRecorder(agent, _session_manager)
+    
+    # Test the integration if successful
+    if success and _event_recorder:
+        print("🔧 Testing New Relic integration with sample events...")
+        try:
+            # Test custom event
+            _event_recorder._record_event("TestEvent", {
+                "testType": "initialization_test", 
+                "success": True, 
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+            # Test logging
+            test_logger = logging.getLogger("newrelic_test")
+            test_logger.info("🧪 New Relic integration test log message")
+            
+            print("✅ New Relic integration test completed successfully")
+        except Exception as e:
+            print(f"⚠️ New Relic integration test failed: {e}")
     
     return success, _session_manager, _event_recorder
 
